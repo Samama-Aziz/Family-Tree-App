@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Person {
+  id         String    @id @default(uuid())
+  name       String
+  nameUrdu   String?
+  gender     String
+  age        Int?
+  dob        DateTime?
+  dod        DateTime?
+  fatherName String?
+  motherName String?
+  isAlive    Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Family {
+  id          String   @id @default(uuid())
+  husbandId   String   // Reference to Person ID
+  husbandName String   // Cached for quick display
+  wifeId      String   // Reference to Person ID
+  wifeName    String   // Cached for quick display
+  sonIds      String[] // Array of person IDs
+  daughterIds String[] // Array of person IDs
+  remarks     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
