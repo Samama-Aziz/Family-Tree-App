@@ -32,7 +32,7 @@ export default function UrduKeyboard({
   return (
     <div
       ref={ref}
-      className="absolute top-full left-0 z-50 mt-1 w-full min-w-[280px] max-w-[min(560px,calc(100vw-2rem))] bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xl"
+      className="absolute top-full left-0 md:left-1/2 md:-translate-x-1/2 z-50 mt-1 w-full md:w-[min(500px,calc(100vw-2rem))] min-w-[280px] max-w-[min(500px,calc(100vw-2rem))] bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xl"
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-black text-slate-400 uppercase tracking-widest">اردو کی بورڈ</span>
@@ -47,13 +47,13 @@ export default function UrduKeyboard({
 
       <div className="space-y-1.5">
         {ROWS.map((row, i) => (
-          <div key={i} className="flex gap-1 justify-center flex-wrap">
+          <div key={i} className="flex gap-1 justify-center flex-nowrap">
             {row.map((char) => (
               <button
                 key={char}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); onChange(value + char); }}
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-base hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all shadow-sm active:scale-90 font-urdu"
+                className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 text-base sm:text-[18px] md:text-[19px] hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all shadow-sm active:scale-90 font-urdu"
               >
                 {char}
               </button>
@@ -65,7 +65,7 @@ export default function UrduKeyboard({
           <button
             type="button"
             onMouseDown={(e) => { e.preventDefault(); onChange(value + " "); }}
-            className="flex-1 h-8 sm:h-9 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 text-sm font-urdu hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all shadow-sm active:scale-95"
+            className="flex-1 h-8 sm:h-9 md:h-10 rounded-lg bg-slate-50 border border-slate-200 text-slate-500 text-sm sm:text-base md:text-lg font-urdu hover:bg-brand-primary hover:text-white hover:border-brand-primary transition-all shadow-sm active:scale-95"
           >
             مسافہ
           </button>

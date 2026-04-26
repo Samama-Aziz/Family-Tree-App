@@ -22,15 +22,30 @@ function toSnap(p: {
   nameUrdu: string | null;
   gender: string;
   isAlive: boolean;
-  age: number | null;
+  dob: Date | null;
+  dod: Date | null;
 }): PersonSnap {
+  let age: number | null = null;
+
+  if (p.dob) {
+    const endDate = !p.isAlive && p.dod ? p.dod : new Date();
+    let years = endDate.getFullYear() - p.dob.getFullYear();
+    const monthDiff = endDate.getMonth() - p.dob.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && endDate.getDate() < p.dob.getDate())) {
+      years -= 1;
+    }
+
+    age = years < 0 ? 0 : years;
+  }
+
   return {
     id: p.id,
     name: p.name,
     nameUrdu: p.nameUrdu,
     gender: p.gender,
     isAlive: p.isAlive,
-    age: p.age,
+    age,
   };
 }
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useCallback } from "react";
 import UrduKeyboard from "@/components/UrduKeyboard";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 type Person = {
   id: string;
@@ -20,13 +21,18 @@ const empty = {
   name: "",
   nameUrdu: "",
   gender: "Male",
-  age: "",
   dob: "",
   dod: "",
   fatherName: "",
   motherName: "",
   isAlive: true,
 };
+
+function isValidDateString(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime());
+}
 
 function CalendarIcon() {
   return (
@@ -44,6 +50,8 @@ export default function PersonsPage() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showUrduKeyboard, setShowUrduKeyboard] = useState(false);
+  const [deletePersonId, setDeletePersonId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function load() {
     try {
@@ -86,7 +94,6 @@ export default function PersonsPage() {
       name: p.name,
       nameUrdu: p.nameUrdu ?? "",
       gender: p.gender,
-      age: p.age?.toString() ?? "",
       dob: p.dob ? p.dob.slice(0, 10) : "",
       dod: p.dod ? p.dod.slice(0, 10) : "",
       fatherName: p.fatherName ?? "",
@@ -108,11 +115,21 @@ export default function PersonsPage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    if (!isValidDateString(form.dob)) {
+      setError("Birth date must be in YYYY-MM-DD format");
+      return;
+    }
+
+    if (!form.isAlive && !isValidDateString(form.dod)) {
+      setError("Date of death must be in YYYY-MM-DD format");
+      return;
+    }
+
     startTransition(async () => {
       const payload = {
         ...form,
         nameUrdu: form.nameUrdu || null,
-        age: form.age ? Number(form.age) : null,
         dob: form.dob || null,
         dod: form.isAlive ? null : (form.dod || null),
         fatherName: form.fatherName || null,
@@ -135,9 +152,12 @@ export default function PersonsPage() {
     });
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this person? This action cannot be undone.")) return;
-    await fetch(`/api/persons/${id}`, { method: "DELETE" });
+  async function handleDeleteConfirm() {
+    if (!deletePersonId) return;
+    setIsDeleting(true);
+    await fetch(`/api/persons/${deletePersonId}`, { method: "DELETE" });
+    setIsDeleting(false);
+    setDeletePersonId(null);
     load();
   }
 
@@ -147,6 +167,23 @@ export default function PersonsPage() {
       : gender === "Female"
       ? "bg-pink-50 text-pink-500 border-pink-100"
       : "bg-slate-50 text-slate-500 border-slate-200";
+
+  const fatherNameSuggestions = Array.from(
+    new Set(
+      persons
+        .filter((p) => p.gender === "Male")
+        .map((p) => `${p.name}${p.nameUrdu ? ` - ${p.nameUrdu}` : ""}`)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const motherNameSuggestions = Array.from(
+    new Set(
+      persons
+        .filter((p) => p.gender === "Female")
+        .map((p) => `${p.name}${p.nameUrdu ? ` - ${p.nameUrdu}` : ""}`)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-20">
@@ -205,7 +242,7 @@ export default function PersonsPage() {
               {/* Urdu Name */}
               <div className="space-y-2 relative sm:col-span-2 lg:col-span-1">
                 <label className="text-sm font-bold text-slate-700 ml-1">
-                  اردو نام <span className="text-slate-400 font-normal text-xs">(Urdu Name)</span>
+                  اردو نام * <span className="text-slate-400 font-normal text-xs">(Urdu Name)</span>
                 </label>
                 <div className="flex items-stretch gap-2">
                   <input
@@ -214,6 +251,7 @@ export default function PersonsPage() {
                     onChange={handleChange}
                     dir="rtl"
                     placeholder="احمد خان"
+                    required
                     className="input-field w-full font-urdu text-lg min-h-[44px]"
                   />
                   <button
@@ -241,70 +279,77 @@ export default function PersonsPage() {
               {/* Gender */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Gender *</label>
-                <select
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                  className="input-field w-full cursor-pointer"
-                  required
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {/* Age */}
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Age</label>
-                <input
-                  name="age"
-                  type="number"
-                  min="0"
-                  max="150"
-                  value={form.age}
-                  onChange={handleChange}
-                  placeholder="e.g. 45"
-                  className="input-field w-full"
-                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(["Male", "Female", "Other"] as const).map((gender) => (
+                    <button
+                      key={gender}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, gender }))}
+                      className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                        form.gender === gender
+                          ? "bg-brand-primary text-white border-brand-primary"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-brand-primary hover:text-brand-primary"
+                      }`}
+                    >
+                      {gender}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Birth Date */}
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1 flex items-center gap-1.5">
-                  <CalendarIcon /> Birth Date
+                  <CalendarIcon /> Birth Date *
                 </label>
                 <input
                   name="dob"
-                  type="date"
+                  type="text"
                   value={form.dob}
                   onChange={handleChange}
+                  placeholder="YYYY-MM-DD"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  required
                   className="input-field w-full"
                 />
               </div>
 
               {/* Father */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Father&apos;s Full Name</label>
+                <label className="text-sm font-bold text-slate-700 ml-1">Father&apos;s Full Name *</label>
                 <input
                   name="fatherName"
                   value={form.fatherName}
                   onChange={handleChange}
                   placeholder="Father's full name"
+                  list="persons-father-name-suggestions"
+                  required
                   className="input-field w-full"
                 />
+                <datalist id="persons-father-name-suggestions">
+                  {fatherNameSuggestions.map((displayName) => (
+                    <option key={displayName} value={displayName} />
+                  ))}
+                </datalist>
               </div>
 
               {/* Mother */}
               <div className="space-y-2">
-                <label className="text-sm font-bold text-slate-700 ml-1">Mother&apos;s Full Name</label>
+                <label className="text-sm font-bold text-slate-700 ml-1">Mother&apos;s Full Name *</label>
                 <input
                   name="motherName"
                   value={form.motherName}
                   onChange={handleChange}
                   placeholder="Mother's full name"
+                  list="persons-mother-name-suggestions"
+                  required
                   className="input-field w-full"
                 />
+                <datalist id="persons-mother-name-suggestions">
+                  {motherNameSuggestions.map((displayName) => (
+                    <option key={displayName} value={displayName} />
+                  ))}
+                </datalist>
               </div>
 
               {/* Is Alive toggle */}
@@ -331,13 +376,16 @@ export default function PersonsPage() {
               {!form.isAlive && (
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700 ml-1 flex items-center gap-1.5">
-                    <CalendarIcon /> Date of Death
+                    <CalendarIcon /> Date of Death *
                   </label>
                   <input
                     name="dod"
-                    type="date"
+                    type="text"
                     value={form.dod}
                     onChange={handleChange}
+                    placeholder="YYYY-MM-DD"
+                    pattern="\d{4}-\d{2}-\d{2}"
+                    required={!form.isAlive}
                     className="input-field w-full"
                   />
                 </div>
@@ -404,7 +452,7 @@ export default function PersonsPage() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
+                          onClick={() => setDeletePersonId(p.id)}
                           className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -516,7 +564,7 @@ export default function PersonsPage() {
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             </button>
                             <button
-                              onClick={() => handleDelete(p.id)}
+                              onClick={() => setDeletePersonId(p.id)}
                               className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
                               title="Delete"
                             >
@@ -533,6 +581,15 @@ export default function PersonsPage() {
           )}
         </div>
       </div>
+
+      <DeleteConfirmModal
+        open={Boolean(deletePersonId)}
+        title="Delete person?"
+        message="This action cannot be undone."
+        busy={isDeleting}
+        onCancel={() => setDeletePersonId(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

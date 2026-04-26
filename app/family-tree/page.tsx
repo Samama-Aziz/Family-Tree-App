@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 
 type Person = { id: string; name: string; nameUrdu?: string | null; gender: string };
 
@@ -177,7 +177,7 @@ function PersonCard({
           {node.name}
         </p>
         {node.nameUrdu && (
-          <p className="text-[12px] text-slate-500 font-urdu leading-relaxed break-words" dir="rtl">
+          <p className="text-[13px] lg:text-[14px] text-slate-500 font-urdu leading-relaxed break-words" dir="rtl">
             {node.nameUrdu}
           </p>
         )}
@@ -304,15 +304,34 @@ function TreeView({
 export default function FamilyTreePage() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [selectedId, setSelectedId] = useState("");
+  const [personQuery, setPersonQuery] = useState("");
+  const [isPersonOpen, setIsPersonOpen] = useState(false);
   const [direction, setDirection] = useState<"upward" | "downward">("downward");
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [detailPersonId, setDetailPersonId] = useState<string | null>(null);
+  const personSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/persons").then((r) => r.json()).then(setPersons);
   }, []);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (personSelectorRef.current && !personSelectorRef.current.contains(e.target as Node)) {
+        setIsPersonOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const filteredPersons = persons.filter((p) => {
+    const haystack = `${p.name} ${p.nameUrdu ?? ""} ${p.gender}`.toLowerCase();
+    return haystack.includes(personQuery.toLowerCase());
+  });
 
   function handleGenerate() {
     if (!selectedId) return;
@@ -339,25 +358,71 @@ export default function FamilyTreePage() {
         </div>
 
         {/* Controls */}
-        <div className="glass-card p-8 mb-12 animate-slide-up relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-16 -mt-16" />
+        <div className="glass-card p-8 mb-12 animate-slide-up relative overflow-visible z-20">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-16 -mt-16 -p" />
 
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-4 gap-6 items-end">
             <div className="lg:col-span-1 space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">Select Person</label>
-              <select
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-                className="input-field w-full cursor-pointer"
-              >
-                <option value="">Choose a person...</option>
-                {persons.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                    {p.nameUrdu ? ` - ${p.nameUrdu}` : ""} ({p.gender})
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={personSelectorRef}>
+                <input
+                  value={personQuery}
+                  onFocus={() => setIsPersonOpen(true)}
+                  onChange={(e) => {
+                    setPersonQuery(e.target.value);
+                    setSelectedId("");
+                    setIsPersonOpen(true);
+                  }}
+                  placeholder="Search a person..."
+                  className="input-field w-full"
+                />
+
+                {selectedId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedId("");
+                      setPersonQuery("");
+                      setIsPersonOpen(false);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                    aria-label="Clear selected person"
+                  >
+                    ×
+                  </button>
+                )}
+
+                {isPersonOpen && (
+                  <div className="absolute left-0 top-full mt-2 z-[999] w-full min-w-[280px] max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {filteredPersons.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-slate-400 italic">No person found</p>
+                    ) : (
+                      filteredPersons.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedId(p.id);
+                            setPersonQuery(p.name);
+                            setIsPersonOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-semibold text-slate-800 shrink-0">{p.name}</span>
+                            {p.nameUrdu && (
+                              <span className="text-sm font-urdu text-slate-600 leading-relaxed" dir="rtl">
+                                {p.nameUrdu}
+                              </span>
+                            )}
+                          </div>
+                          <span className="block text-[11px] text-slate-400 mt-0.5">{p.gender}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="lg:col-span-2 space-y-2">

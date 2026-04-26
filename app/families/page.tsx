@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";
+import DeleteConfirmModal from "@/components/DeleteConfirmModal";
 
 type Person = {
   id: string;
@@ -34,6 +35,122 @@ const empty = {
   remarks: "",
 };
 
+function isValidDateString(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime());
+}
+
+function personLabel(p: Person) {
+  return `${p.name}${p.nameUrdu ? ` - ${p.nameUrdu}` : ""}`;
+}
+
+function personSearchText(p: Person) {
+  return `${p.name} ${p.nameUrdu ?? ""} ${p.fatherName ?? ""} ${p.motherName ?? ""}`.toLowerCase();
+}
+
+function SearchablePersonSelect({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Person[];
+  placeholder: string;
+  onChange: (id: string) => void;
+}) {
+  const selected = options.find((p) => p.id === value) ?? null;
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        if (!value) setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [value]);
+
+  const filtered = options.filter((p) => personSearchText(p).includes(query.toLowerCase()));
+
+  return (
+    <div className="space-y-2" ref={ref}>
+      <label className="text-sm font-bold text-slate-700 ml-1">{label}</label>
+      <div className="relative">
+        <input
+          value={open ? query : (selected ? personLabel(selected) : query)}
+          onFocus={() => {
+            setOpen(true);
+            setQuery(selected ? personLabel(selected) : query);
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (value) onChange("");
+          }}
+          placeholder={placeholder}
+          className="input-field w-full"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setQuery("");
+              setOpen(false);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+            aria-label={`Clear ${label}`}
+          >
+            ×
+          </button>
+        )}
+        {open && (
+          <div className="absolute z-30 mt-2 w-full max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+            {filtered.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-slate-400 italic">No person found</p>
+            ) : (
+              filtered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(p.id);
+                    setQuery(personLabel(p));
+                    setOpen(false);
+                  }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                >
+                  <span className="block text-sm font-medium text-slate-700">{p.name}</span>
+                  {p.nameUrdu && (
+                    <span className="block text-xs lg:text-sm text-slate-500 font-urdu leading-relaxed" dir="rtl">
+                      {p.nameUrdu}
+                    </span>
+                  )}
+                  {(p.fatherName || p.motherName) && (
+                    <span className="mt-1 block text-[11px] text-slate-500 leading-relaxed">
+                      {p.fatherName ? `Father: ${p.fatherName}` : "Father: Unknown"}
+                      {" | "}
+                      {p.motherName ? `Mother: ${p.motherName}` : "Mother: Unknown"}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── PersonPicker ─────────────────────────────────────────────────────────────
 
 function PersonPicker({
@@ -50,6 +167,7 @@ function PersonPicker({
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,6 +180,7 @@ function PersonPicker({
 
   const selected = available.filter((p) => selectedIds.includes(p.id));
   const unselected = available.filter((p) => !selectedIds.includes(p.id));
+  const filtered = unselected.filter((p) => personSearchText(p).includes(query.toLowerCase()));
 
   return (
     <div className="space-y-2">
@@ -75,7 +194,7 @@ function PersonPicker({
             <span className="max-w-[180px]">
               <span className="block break-words">{p.name}</span>
               {p.nameUrdu && (
-                <span className="block text-[11px] text-slate-500 font-urdu leading-relaxed" dir="rtl">
+                <span className="block text-xs lg:text-sm text-slate-500 font-urdu leading-relaxed" dir="rtl">
                   {p.nameUrdu}
                 </span>
               )}
@@ -90,41 +209,46 @@ function PersonPicker({
           </span>
         ))}
 
-        <div className="relative" ref={ref}>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className={`w-7 h-7 rounded-full flex items-center justify-center text-lg font-bold leading-none transition-all ${
-              open
-                ? "bg-brand-primary text-white"
-                : "bg-slate-100 hover:bg-brand-primary hover:text-white text-slate-500"
-            }`}
-            title={`Add ${label.slice(0, -1)}`}
-          >
-            +
-          </button>
+        <div className="relative min-w-[220px] flex-1" ref={ref}>
+          <input
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            placeholder={`Search ${label.toLowerCase()}...`}
+            className="input-field w-full min-h-[40px]"
+          />
 
           {open && (
-            <div className="absolute left-0 top-9 z-30 w-52 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-              {unselected.length === 0 ? (
+            <div className="absolute left-0 top-11 z-30 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+              {filtered.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-slate-400 italic">
-                  No more persons available
+                  {unselected.length === 0 ? "No more persons available" : "No match found"}
                 </p>
               ) : (
-                unselected.map((p) => (
+                filtered.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => {
                       onAdd(p.id);
-                      setOpen(false);
+                      setQuery("");
                     }}
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 text-slate-700 font-medium transition-colors border-b border-slate-100 last:border-0"
                   >
                     <span className="block">{p.name}</span>
                     {p.nameUrdu && (
-                      <span className="block text-[11px] text-slate-500 font-urdu leading-relaxed" dir="rtl">
+                      <span className="block text-xs lg:text-sm text-slate-500 font-urdu leading-relaxed" dir="rtl">
                         {p.nameUrdu}
+                      </span>
+                    )}
+                    {(p.fatherName || p.motherName) && (
+                      <span className="mt-1 block text-[11px] text-slate-500 leading-relaxed">
+                        {p.fatherName ? `Father: ${p.fatherName}` : "Father: Unknown"}
+                        {" | "}
+                        {p.motherName ? `Mother: ${p.motherName}` : "Mother: Unknown"}
                       </span>
                     )}
                   </button>
@@ -152,6 +276,13 @@ export default function FamiliesPage() {
   const [quickAddName, setQuickAddName] = useState("");
   const [quickAddNameUrdu, setQuickAddNameUrdu] = useState("");
   const [quickAddGender, setQuickAddGender] = useState("Male");
+  const [quickAddDob, setQuickAddDob] = useState("");
+  const [quickAddFatherName, setQuickAddFatherName] = useState("");
+  const [quickAddMotherName, setQuickAddMotherName] = useState("");
+  const [quickAddIsAlive, setQuickAddIsAlive] = useState(true);
+  const [quickAddDod, setQuickAddDod] = useState("");
+  const [deleteFamilyId, setDeleteFamilyId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function loadFamilies() {
     try {
@@ -202,22 +333,54 @@ export default function FamiliesPage() {
   }
 
   async function handleQuickAdd() {
-    if (!quickAddName) return;
+    if (
+      !quickAddName ||
+      !quickAddNameUrdu ||
+      !quickAddDob ||
+      !quickAddFatherName ||
+      !quickAddMotherName ||
+      (!quickAddIsAlive && !quickAddDod)
+    ) {
+      setError("Please fill all required Quick Add fields");
+      return;
+    }
+
+    if (!isValidDateString(quickAddDob)) {
+      setError("Birth date must be in YYYY-MM-DD format");
+      return;
+    }
+
+    if (!quickAddIsAlive && !isValidDateString(quickAddDod)) {
+      setError("Date of death must be in YYYY-MM-DD format");
+      return;
+    }
+
     try {
       const res = await fetch("/api/persons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: quickAddName,
-          nameUrdu: quickAddNameUrdu || null,
+          nameUrdu: quickAddNameUrdu,
           gender: quickAddGender,
+          dob: quickAddDob,
+          fatherName: quickAddFatherName,
+          motherName: quickAddMotherName,
+          isAlive: quickAddIsAlive,
+          dod: quickAddIsAlive ? null : quickAddDod,
         }),
       });
       if (!res.ok) throw new Error("Failed to create");
       setQuickAddName("");
       setQuickAddNameUrdu("");
       setQuickAddGender("Male");
+      setQuickAddDob("");
+      setQuickAddFatherName("");
+      setQuickAddMotherName("");
+      setQuickAddIsAlive(true);
+      setQuickAddDod("");
       setShowQuickAdd(false);
+      setError("");
       await loadPersons();
     } catch {
       setError("Failed to add person");
@@ -249,14 +412,31 @@ export default function FamiliesPage() {
     });
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this family record?")) return;
-    await fetch(`/api/families/${id}`, { method: "DELETE" });
+  async function handleDeleteConfirm() {
+    if (!deleteFamilyId) return;
+    setIsDeleting(true);
+    await fetch(`/api/families/${deleteFamilyId}`, { method: "DELETE" });
+    setIsDeleting(false);
+    setDeleteFamilyId(null);
     loadFamilies();
   }
 
   const males = persons.filter((p) => p.gender === "Male");
   const females = persons.filter((p) => p.gender === "Female");
+  const fatherNameSuggestions = Array.from(
+    new Set(
+      males
+        .map((p) => `${p.name}${p.nameUrdu ? ` - ${p.nameUrdu}` : ""}`)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+  const motherNameSuggestions = Array.from(
+    new Set(
+      females
+        .map((p) => `${p.name}${p.nameUrdu ? ` - ${p.nameUrdu}` : ""}`)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-20">
@@ -273,50 +453,134 @@ export default function FamiliesPage() {
               Link ancestors and descendants together
             </p>
           </div>
-          {!showForm && (
-            <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-3 flex-wrap">
+            {!showForm && (
               <button onClick={() => setShowForm(true)} className="btn-primary">
                 Add Family Record
               </button>
-              <button onClick={() => setShowQuickAdd(true)} className="btn-outline">
-                Quick Add Person
-              </button>
-            </div>
-          )}
+            )}
+            <button onClick={() => setShowQuickAdd(true)} className="btn-outline">
+              Quick Add Person
+            </button>
+          </div>
         </div>
 
         {/* Quick Add Person */}
         {showQuickAdd && (
           <div className="glass-card p-6 mb-12 animate-slide-up">
             <h3 className="text-lg font-bold mb-4 text-slate-800">Quick Add Person</h3>
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-1">
                 <input
                   type="text"
-                  placeholder="Enter full name..."
+                  placeholder="Enter full name... *"
                   value={quickAddName}
                   onChange={(e) => setQuickAddName(e.target.value)}
+                  required
                   className="input-field w-full"
                 />
               </div>
-              <div className="flex-1 min-w-[200px]">
+              <div className="lg:col-span-1">
                 <input
                   type="text"
-                  placeholder="اردو نام"
+                  placeholder="اردو نام *"
                   value={quickAddNameUrdu}
                   onChange={(e) => setQuickAddNameUrdu(e.target.value)}
                   dir="rtl"
+                  required
                   className="input-field w-full font-urdu text-lg"
                 />
               </div>
-              <select
-                value={quickAddGender}
-                onChange={(e) => setQuickAddGender(e.target.value)}
-                className="input-field min-w-[120px]"
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
+              <div className="lg:col-span-1">
+                <input
+                  type="text"
+                  value={quickAddDob}
+                  onChange={(e) => setQuickAddDob(e.target.value)}
+                  placeholder="Birth date (YYYY-MM-DD) *"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  required
+                  className="input-field w-full"
+                />
+              </div>
+              <div className="lg:col-span-1">
+                <input
+                  type="text"
+                  placeholder="Father's full name *"
+                  value={quickAddFatherName}
+                  onChange={(e) => setQuickAddFatherName(e.target.value)}
+                  list="father-name-suggestions"
+                  required
+                  className="input-field w-full"
+                />
+                <datalist id="father-name-suggestions">
+                  {fatherNameSuggestions.map((displayName) => (
+                    <option key={displayName} value={displayName} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="lg:col-span-1">
+                <input
+                  type="text"
+                  placeholder="Mother's full name *"
+                  value={quickAddMotherName}
+                  onChange={(e) => setQuickAddMotherName(e.target.value)}
+                  list="mother-name-suggestions"
+                  required
+                  className="input-field w-full"
+                />
+                <datalist id="mother-name-suggestions">
+                  {motherNameSuggestions.map((displayName) => (
+                    <option key={displayName} value={displayName} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {(["Male", "Female", "Other"] as const).map((gender) => (
+                  <button
+                    key={gender}
+                    type="button"
+                    onClick={() => setQuickAddGender(gender)}
+                    className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                      quickAddGender === gender
+                        ? "bg-brand-primary text-white border-brand-primary"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-brand-primary hover:text-brand-primary"
+                    }`}
+                  >
+                    {gender}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={quickAddIsAlive}
+                  onClick={() => setQuickAddIsAlive((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                    quickAddIsAlive ? "bg-brand-accent" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                      quickAddIsAlive ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <span className="text-sm font-bold text-slate-700">Is Alive</span>
+              </div>
+              {!quickAddIsAlive && (
+                <div>
+                  <input
+                    type="text"
+                    value={quickAddDod}
+                    onChange={(e) => setQuickAddDod(e.target.value)}
+                    placeholder="Date of death (YYYY-MM-DD)"
+                    pattern="\d{4}-\d{2}-\d{2}"
+                    required
+                    className="input-field w-full"
+                  />
+                </div>
+              )}
               <button onClick={handleQuickAdd} className="btn-primary px-8">
                 Add
               </button>
@@ -333,9 +597,14 @@ export default function FamiliesPage() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 rounded-full -mr-16 -mt-16" />
 
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold">
-                {editId ? "Edit Family Link" : "Create Family Record"}
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {editId ? "Edit Family Link" : "Create Family Record"}
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Mother/Father names and Urdu name are managed in Person records.
+                </p>
+              </div>
               <button
                 onClick={cancelEdit}
                 className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
@@ -347,40 +616,20 @@ export default function FamiliesPage() {
             <form onSubmit={handleSubmit} className="relative z-10 space-y-8">
               {/* Couple selectors */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Husband *</label>
-                  <select
-                    value={form.husbandId}
-                    onChange={(e) => setForm({ ...form, husbandId: e.target.value })}
-                    className="input-field w-full cursor-pointer"
-                    required
-                  >
-                    <option value="">Select Husband...</option>
-                    {males.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                        {p.nameUrdu ? ` - ${p.nameUrdu}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 ml-1">Wife *</label>
-                  <select
-                    value={form.wifeId}
-                    onChange={(e) => setForm({ ...form, wifeId: e.target.value })}
-                    className="input-field w-full cursor-pointer"
-                    required
-                  >
-                    <option value="">Select Wife...</option>
-                    {females.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                        {p.nameUrdu ? ` - ${p.nameUrdu}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchablePersonSelect
+                  label="Husband *"
+                  value={form.husbandId}
+                  options={males}
+                  placeholder="Search husband by name..."
+                  onChange={(id) => setForm((f) => ({ ...f, husbandId: id }))}
+                />
+                <SearchablePersonSelect
+                  label="Wife *"
+                  value={form.wifeId}
+                  options={females}
+                  placeholder="Search wife by name..."
+                  onChange={(id) => setForm((f) => ({ ...f, wifeId: id }))}
+                />
               </div>
 
               {/* Children pickers */}
@@ -557,7 +806,7 @@ export default function FamiliesPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(f.id)}
+                        onClick={() => setDeleteFamilyId(f.id)}
                         className="flex items-center gap-1.5 px-3 py-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors text-sm font-semibold"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -571,6 +820,15 @@ export default function FamiliesPage() {
           )}
         </div>
       </div>
+
+      <DeleteConfirmModal
+        open={Boolean(deleteFamilyId)}
+        title="Delete family record?"
+        message="This action cannot be undone."
+        busy={isDeleting}
+        onCancel={() => setDeleteFamilyId(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }
