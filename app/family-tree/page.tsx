@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";
+import { formatDate } from "@/lib/format-date";
 
-type Person = { id: string; name: string; nameUrdu?: string | null; gender: string };
+type Person = { id: string; name: string; nameUrdu?: string | null; gender: string; fatherName?: string | null; motherName?: string | null };
 
 type FullPerson = {
   id: string;
@@ -104,15 +105,9 @@ function PersonDetailModal({
             <div className="space-y-3">
               <Row label="Gender" value={person.gender} />
               <Row label="Age" value={person.age ? `${person.age} years` : "—"} />
-              <Row
-                label="Date of Birth"
-                value={person.dob ? new Date(person.dob).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—"}
-              />
+              <Row label="Date of Birth" value={formatDate(person.dob)} />
               {!person.isAlive && (
-                <Row
-                  label="Date of Death"
-                  value={person.dod ? new Date(person.dod).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—"}
-                />
+                <Row label="Date of Death" value={formatDate(person.dod)} />
               )}
               <div className="border-t border-slate-100 pt-3 mt-3 space-y-3">
                 <Row label="Father" value={person.fatherName ?? "Unknown"} />
@@ -329,7 +324,7 @@ export default function FamilyTreePage() {
   }, []);
 
   const filteredPersons = persons.filter((p) => {
-    const haystack = `${p.name} ${p.nameUrdu ?? ""} ${p.gender}`.toLowerCase();
+    const haystack = `${p.name} ${p.nameUrdu ?? ""} ${p.gender} ${p.fatherName ?? ""} ${p.motherName ?? ""}`.toLowerCase();
     return haystack.includes(personQuery.toLowerCase());
   });
 
@@ -416,7 +411,14 @@ export default function FamilyTreePage() {
                               </span>
                             )}
                           </div>
-                          <span className="block text-[11px] text-slate-400 mt-0.5">{p.gender}</span>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="text-[11px] text-slate-400">{p.gender}</span>
+                            {(p.fatherName || p.motherName) && (
+                              <span className="text-[11px] text-slate-400">
+                                {p.fatherName ? `Father: ${p.fatherName}` : "Father: Unknown"} · {p.motherName ? `Mother: ${p.motherName}` : "Mother: Unknown"}
+                              </span>
+                            )}
+                          </div>
                         </button>
                       ))
                     )}

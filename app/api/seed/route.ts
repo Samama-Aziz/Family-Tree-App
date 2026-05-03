@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { generatePersonDisplayId, generateFamilyDisplayId } from "@/lib/id-generator";
 
 export async function POST() {
   try {
@@ -9,6 +10,7 @@ export async function POST() {
     // ── Generation 1: Grandparents ─────────────────────────────────
     const ahmad = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Ahmad Khan",
         gender: "Male",
         age: 84,
@@ -22,6 +24,7 @@ export async function POST() {
 
     const fatima = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Fatima Begum",
         gender: "Female",
         age: 78,
@@ -35,6 +38,7 @@ export async function POST() {
     // ── Generation 2: Children of Ahmad & Fatima ──────────────────
     const hassan = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Hassan Khan",
         gender: "Male",
         age: 53,
@@ -47,6 +51,7 @@ export async function POST() {
 
     const zara = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Zara Malik",
         gender: "Female",
         age: 48,
@@ -60,6 +65,7 @@ export async function POST() {
     // ── Generation 2: Spouses ──────────────────────────────────────
     const sara = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Sara Ahmed",
         gender: "Female",
         age: 50,
@@ -72,6 +78,7 @@ export async function POST() {
 
     const khalid = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Khalid Malik",
         gender: "Male",
         age: 50,
@@ -85,6 +92,7 @@ export async function POST() {
     // ── Generation 3: Children of Hassan & Sara ────────────────────
     const imran = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Imran Hassan",
         gender: "Male",
         age: 27,
@@ -97,6 +105,7 @@ export async function POST() {
 
     const nadia = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Nadia Hassan",
         gender: "Female",
         age: 24,
@@ -109,6 +118,7 @@ export async function POST() {
 
     const omar = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Omar Hassan",
         gender: "Male",
         age: 22,
@@ -122,6 +132,7 @@ export async function POST() {
     // ── Generation 3: Child of Khalid & Zara ──────────────────────
     const aisha = await prisma.person.create({
       data: {
+        displayId: await generatePersonDisplayId(),
         name: "Aisha Khalid",
         gender: "Female",
         age: 21,
@@ -135,6 +146,7 @@ export async function POST() {
     // ── Family Records ─────────────────────────────────────────────
     await prisma.family.create({
       data: {
+        displayId: await generateFamilyDisplayId(),
         husbandId: ahmad.id,
         husbandName: ahmad.name,
         wifeId: fatima.id,
@@ -147,6 +159,7 @@ export async function POST() {
 
     await prisma.family.create({
       data: {
+        displayId: await generateFamilyDisplayId(),
         husbandId: hassan.id,
         husbandName: hassan.name,
         wifeId: sara.id,
@@ -158,6 +171,7 @@ export async function POST() {
 
     await prisma.family.create({
       data: {
+        displayId: await generateFamilyDisplayId(),
         husbandId: khalid.id,
         husbandName: khalid.name,
         wifeId: zara.id,

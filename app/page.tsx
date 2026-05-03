@@ -1,29 +1,5 @@
 import Link from "next/link";
 
-const cards = [
-  {
-    href: "/persons",
-    title: "Persons",
-    initial: "P",
-    desc: "Add and manage individual people with personal details, parents, and vital dates.",
-    gradient: "from-cyan-500 to-blue-500",
-  },
-  {
-    href: "/families",
-    title: "Families",
-    initial: "F",
-    desc: "Record family units linking husband, wife, sons, and daughters.",
-    gradient: "from-purple-500 to-pink-500",
-  },
-  {
-    href: "/family-tree",
-    title: "Family Tree",
-    initial: "T",
-    desc: "Select any person and visualize their ancestors (upward) or descendants (downward).",
-    gradient: "from-green-500 to-emerald-500",
-  },
-];
-
 export default function Home() {
   return (
     <div className="min-h-screen relative overflow-hidden bg-white">
@@ -56,32 +32,6 @@ export default function Home() {
               Manage Persons
             </Link>
           </div>
-        </div>
-
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {cards.map((c, idx) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              className="glass-card group hover:scale-[1.02] hover:-translate-y-1 transition-all duration-300 p-8 flex flex-col items-start gap-4 animate-slide-up relative overflow-hidden"
-              style={{ animationDelay: `${idx * 100}ms` }}
-            >
-              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${c.gradient} opacity-70 group-hover:opacity-100 transition-opacity duration-300`} />
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white bg-gradient-to-br ${c.gradient} shadow-sm`}>
-                {c.initial}
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 group-hover:text-blue-500 transition-colors">
-                {c.title}
-              </h3>
-              <p className="text-slate-500 leading-relaxed">
-                {c.desc}
-              </p>
-              <div className="mt-auto pt-4 flex items-center gap-2 text-blue-500 font-semibold group-hover:gap-3 transition-all">
-                Get Started <span>→</span>
-              </div>
-            </Link>
-          ))}
         </div>
 
         {/* How it Works */}

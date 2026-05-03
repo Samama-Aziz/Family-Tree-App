@@ -9,30 +9,83 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("user") // "user" | "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Person {
-  id         String    @id @default(uuid())
-  name       String
-  nameUrdu   String?
-  gender     String
-  age        Int?
-  dob        DateTime?
-  dod        DateTime?
-  fatherName String?
-  motherName String?
-  isAlive    Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  displayId   String    @unique  // Format: P_XXXXX
+  name        String
+  nameUrdu    String?
+  gender      String
+  age         Int?
+  dob         DateTime?
+  dod         DateTime?
+  fatherName  String?
+  motherName  String?
+  caste       String?
+  isAlive     Boolean   @default(true)
+  submittedBy String?   // userId of the user whose pending submission was approved
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Family {
   id          String   @id @default(uuid())
-  husbandId   String   // Reference to Person ID
-  husbandName String   // Cached for quick display
-  wifeId      String   // Reference to Person ID
-  wifeName    String   // Cached for quick display
-  sonIds      String[] // Array of person IDs
-  daughterIds String[] // Array of person IDs
+  displayId   String   @unique  // Format: F_XXXXX
+  husbandId   String
+  husbandName String
+  wifeId      String
+  wifeName    String
+  sonIds      String[]
+  daughterIds String[]
   remarks     String?
+  submittedBy String?  // userId of the user whose pending submission was approved
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model PendingPerson {
+  id              String    @id @default(uuid())
+  displayId       String    @unique  // Format: P_XXXXX
+  name            String
+  nameUrdu        String?
+  gender          String
+  dob             DateTime?
+  dod             DateTime?
+  fatherName      String?
+  motherName      String?
+  caste           String?
+  isAlive         Boolean   @default(true)
+  status          String    @default("pending") // "pending" | "approved" | "rejected"
+  submittedBy     String    // userId
+  rejectionReason String?
+  approvedPersonId String?  // Person.id created after approval
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model PendingFamily {
+  id               String   @id @default(uuid())
+  displayId        String   @unique  // Format: F_XXXXX
+  husbandId        String
+  husbandName      String
+  wifeId           String
+  wifeName         String
+  sonIds           String[]
+  daughterIds      String[]
+  remarks          String?
+  status           String   @default("pending") // "pending" | "approved" | "rejected"
+  submittedBy      String   // userId
+  rejectionReason  String?
+  approvedFamilyId String?  // Family.id created after approval
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isResponse } from "@/lib/auth-helpers";
 import { NextRequest } from "next/server";
 
 export type PersonSnap = {
@@ -17,55 +18,40 @@ export type TreeNode = PersonSnap & {
 };
 
 function toSnap(p: {
-  id: string;
-  name: string;
-  nameUrdu: string | null;
-  gender: string;
-  isAlive: boolean;
-  dob: Date | null;
-  dod: Date | null;
+  id: string; name: string; nameUrdu: string | null; gender: string;
+  isAlive: boolean; dob: Date | null; dod: Date | null;
 }): PersonSnap {
   let age: number | null = null;
-
   if (p.dob) {
     const endDate = !p.isAlive && p.dod ? p.dod : new Date();
     let years = endDate.getFullYear() - p.dob.getFullYear();
     const monthDiff = endDate.getMonth() - p.dob.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && endDate.getDate() < p.dob.getDate())) {
-      years -= 1;
-    }
-
+    if (monthDiff < 0 || (monthDiff === 0 && endDate.getDate() < p.dob.getDate())) years -= 1;
     age = years < 0 ? 0 : years;
   }
-
-  return {
-    id: p.id,
-    name: p.name,
-    nameUrdu: p.nameUrdu,
-    gender: p.gender,
-    isAlive: p.isAlive,
-    age,
-  };
+  return { id: p.id, name: p.name, nameUrdu: p.nameUrdu, gender: p.gender, isAlive: p.isAlive, age };
 }
-
-// ── Downward (descendants) ───────────────────────────────────────────────────
-// Finds all Family records where person is husband or wife, collects sonIds +
-// daughterIds as children, and recurses. Partner comes from the same Family row.
 
 async function buildDownward(
   personId: string,
   visited: Set<string>,
-  depth: number
+  depth: number,
+  userId: string,
+  isAdmin: boolean
 ): Promise<TreeNode | null> {
   if (depth > 8 || visited.has(personId)) return null;
   visited.add(personId);
 
-  const person = await prisma.person.findUnique({ where: { id: personId } });
+  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: userId };
+  const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return null;
 
+  const familyWhere = isAdmin
+    ? { OR: [{ husbandId: personId }, { wifeId: personId }] }
+    : { OR: [{ husbandId: personId }, { wifeId: personId }], submittedBy: userId };
+
   const families = await prisma.family.findMany({
-    where: { OR: [{ husbandId: personId }, { wifeId: personId }] },
+    where: familyWhere,
     orderBy: { createdAt: "asc" },
   });
 
@@ -73,16 +59,13 @@ async function buildDownward(
   const childIds: string[] = [];
 
   for (const family of families) {
-    // Collect children from every family this person belongs to
     childIds.push(...family.sonIds, ...family.daughterIds);
-
-    // Use first family found to set the partner
     if (!partner) {
-      const partnerId =
-        family.husbandId === personId ? family.wifeId : family.husbandId;
+      const partnerId = family.husbandId === personId ? family.wifeId : family.husbandId;
       if (!visited.has(partnerId)) {
         visited.add(partnerId);
-        const rec = await prisma.person.findUnique({ where: { id: partnerId } });
+        const partnerWhere = isAdmin ? { id: partnerId } : { id: partnerId, submittedBy: userId };
+        const rec = await prisma.person.findFirst({ where: partnerWhere });
         if (rec) partner = toSnap(rec);
       }
     }
@@ -90,84 +73,76 @@ async function buildDownward(
 
   const uniqueChildIds = [...new Set(childIds)];
   const children: TreeNode[] = [];
-
   for (const childId of uniqueChildIds) {
-    const node = await buildDownward(childId, new Set(visited), depth + 1);
+    const node = await buildDownward(childId, new Set(visited), depth + 1, userId, isAdmin);
     if (node) children.push(node);
   }
 
   return { ...toSnap(person), partner, children };
 }
 
-// ── Upward (ancestors) ───────────────────────────────────────────────────────
-// Finds the Family record where this person is a son or daughter. The husband
-// is the father (primary ancestor shown on the left); the wife is attached as
-// partner on the same row. Recurses upward through the father's lineage.
-
 async function buildUpward(
   personId: string,
   visited: Set<string>,
-  depth: number
+  depth: number,
+  userId: string,
+  isAdmin: boolean
 ): Promise<TreeNode | null> {
   if (depth > 8 || visited.has(personId)) return null;
   visited.add(personId);
 
-  const person = await prisma.person.findUnique({ where: { id: personId } });
+  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: userId };
+  const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return null;
 
-  const parentFamily = await prisma.family.findFirst({
-    where: {
-      OR: [
-        { sonIds: { has: personId } },
-        { daughterIds: { has: personId } },
-      ],
-    },
-  });
+  const familyWhere = isAdmin
+    ? { OR: [{ sonIds: { has: personId } }, { daughterIds: { has: personId } }] }
+    : {
+        AND: [
+          { OR: [{ sonIds: { has: personId } }, { daughterIds: { has: personId } }] },
+          { submittedBy: userId },
+        ],
+      };
 
+  const parentFamily = await prisma.family.findFirst({ where: familyWhere });
   const children: TreeNode[] = [];
 
   if (parentFamily) {
     const { husbandId: fatherId, wifeId: motherId } = parentFamily;
 
-    // Build father's full ancestor chain (mutates visited in-place)
     if (!visited.has(fatherId)) {
-      const fatherNode = await buildUpward(fatherId, visited, depth + 1);
-      if (fatherNode) {
-        fatherNode.relation = "Father";
-        children.push(fatherNode);
-      }
+      const fatherNode = await buildUpward(fatherId, visited, depth + 1, userId, isAdmin);
+      if (fatherNode) { fatherNode.relation = "Father"; children.push(fatherNode); }
     }
 
-    // Build mother's full ancestor chain (separate copy so her branch isn't
-    // blocked by nodes already visited on the father's side)
     if (!visited.has(motherId)) {
-      const motherNode = await buildUpward(motherId, new Set(visited), depth + 1);
-      if (motherNode) {
-        motherNode.relation = "Mother";
-        children.push(motherNode);
-      }
+      const motherNode = await buildUpward(motherId, new Set(visited), depth + 1, userId, isAdmin);
+      if (motherNode) { motherNode.relation = "Mother"; children.push(motherNode); }
     }
   }
 
   return { ...toSnap(person), children };
 }
 
-// ── Route handler ────────────────────────────────────────────────────────────
-
 export async function GET(
   request: NextRequest,
   ctx: RouteContext<"/api/family-tree/[personId]">
 ) {
+  const auth = await requireAuth(request);
+  if (isResponse(auth)) return auth;
+
   const { personId } = await ctx.params;
   const direction = request.nextUrl.searchParams.get("direction") ?? "downward";
+  const isAdmin = auth.role === "admin";
 
-  const person = await prisma.person.findUnique({ where: { id: personId } });
+  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: auth.userId };
+  const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return Response.json({ error: "Person not found" }, { status: 404 });
 
   const tree =
     direction === "upward"
-      ? await buildUpward(personId, new Set(), 0)
-      : await buildDownward(personId, new Set(), 0);
+      ? await buildUpward(personId, new Set(), 0, auth.userId, isAdmin)
+      : await buildDownward(personId, new Set(), 0, auth.userId, isAdmin);
 
   return Response.json({ tree, direction });
 }
