@@ -37,8 +37,14 @@ export default function AdminFamiliesPage() {
       fetch("/api/admin/pending/families"),
       fetch("/api/persons"),
     ]);
-    if (familiesRes.ok) setItems(await familiesRes.json());
-    if (personsRes.ok) setPersons(await personsRes.json());
+    if (familiesRes.ok) {
+      const data = await familiesRes.json();
+      setItems(Array.isArray(data) ? data : []);
+    }
+    if (personsRes.ok) {
+      const data = await personsRes.json();
+      setPersons(Array.isArray(data) ? data : []);
+    }
     setLoading(false);
   }, []);
 

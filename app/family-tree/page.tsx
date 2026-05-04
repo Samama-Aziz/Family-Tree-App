@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import { formatDate } from "@/lib/format-date";
 
-type Person = { id: string; name: string; nameUrdu?: string | null; gender: string; fatherName?: string | null; motherName?: string | null };
+type Person = { id: string; name: string; nameUrdu?: string | null; gender: string; fatherName?: string | null; motherName?: string | null; caste?: string | null };
 
 type FullPerson = {
   id: string;
@@ -323,10 +323,13 @@ export default function FamilyTreePage() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  const filteredPersons = persons.filter((p) => {
-    const haystack = `${p.name} ${p.nameUrdu ?? ""} ${p.gender} ${p.fatherName ?? ""} ${p.motherName ?? ""}`.toLowerCase();
-    return haystack.includes(personQuery.toLowerCase());
-  });
+const filteredPersons = persons.filter((p) => {
+  const haystack = [p.name, p.nameUrdu, p.gender, p.fatherName, p.motherName, p.caste]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(personQuery.toLowerCase().trim());
+});
 
   function handleGenerate() {
     if (!selectedId) return;

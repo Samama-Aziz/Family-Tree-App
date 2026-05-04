@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const where = auth.role === "admin" ? {} : { submittedBy: auth.userId };
-    const families = await prisma.family.findMany({ where, orderBy: { createdAt: "desc" } });
+    const families = await prisma.family.findMany({ where, orderBy: { husbandName: "asc" } });
 
     const enrichedFamilies = await Promise.all(
       families.map(async (family) => {

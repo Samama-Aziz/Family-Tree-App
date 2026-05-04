@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const where = auth.role === "admin" ? {} : { submittedBy: auth.userId };
-    const persons = await prisma.person.findMany({ where, orderBy: { createdAt: "desc" } });
+    const persons = await prisma.person.findMany({ where, orderBy: { name: "asc" } });
 
     const userIds = [...new Set(persons.map((p) => p.submittedBy).filter(Boolean))] as string[];
     const users = await prisma.user.findMany({

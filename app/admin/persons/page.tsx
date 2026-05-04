@@ -245,7 +245,14 @@ export default function AdminPersonsPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Caste</label>
-                <input name="caste" value={form.caste || ""} onChange={handleChange} placeholder="Caste" className="input-field w-full min-h-[44px] h-[44px]" />
+                <select name="caste" value={form.caste || ""} onChange={handleChange} className="input-field w-full min-h-[44px] h-[44px]">
+                  <option value="">— Select caste —</option>
+                  <option value="Arayan">Arayan</option>
+                  <option value="Baig Khan">Baig Khan</option>
+                  <option value="Chohan">Chohan</option>
+                  <option value="Khokhar">Khokhar</option>
+                  <option value="Mughal">Mughal</option>
+                </select>
               </div>
 
               <div className="flex items-center gap-3 pt-5">

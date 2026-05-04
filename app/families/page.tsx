@@ -65,7 +65,10 @@ function personLabel(p: Person) {
 }
 
 function personSearchText(p: Person) {
-  return `${p.name} ${p.nameUrdu ?? ""} ${p.fatherName ?? ""} ${p.motherName ?? ""}`.toLowerCase();
+  return [p.name, p.nameUrdu, p.gender, p.fatherName, p.motherName, p.caste]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 function StatusBadge({ status, reason }: { status: string; reason?: string | null }) {
@@ -284,6 +287,7 @@ function ChildCard({
   const isAlive = full?.isAlive ?? person.isAlive;
   const caste = full?.caste ?? person.caste;
   const dob = full?.dob ?? person.dob;
+  const dod = full?.dod ?? person.dod;
 
   const bg = accent === "blue" ? "bg-white border-blue-100 hover:border-blue-300 hover:bg-blue-50/40" : "bg-white border-pink-100 hover:border-pink-300 hover:bg-pink-50/40";
   const genderBadge = accent === "blue" ? "bg-blue-50 text-blue-700" : "bg-pink-50 text-pink-700";
@@ -312,7 +316,8 @@ function ChildCard({
 
       {/* Details */}
       <div className="text-[10px] text-slate-500 space-y-0.5">
-        {dob && <p>{formatDate(dob)}</p>}
+        {dob && <p>DOB: {formatDate(dob)}</p>}
+        {dod && <p>DOD: {formatDate(dod)}</p>}
         {caste && <p>Caste: <span className="font-semibold text-slate-600">{caste}</span></p>}
         <p>Father: {person.fatherName || "Unknown"}</p>
         <p>Mother: {person.motherName || "Unknown"}</p>
@@ -353,12 +358,13 @@ export default function FamiliesPage() {
 
   const filteredFamilies = families.filter((f) => {
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      f.husbandName.toLowerCase().includes(q) ||
-      f.wifeName.toLowerCase().includes(q) ||
-      f.displayId.toLowerCase().includes(q)
-    );
+    const q = searchQuery.toLowerCase().trim();
+    const haystack = [
+      f.husbandName, f.wifeName, f.displayId,
+      f.husband?.nameUrdu, f.husband?.fatherName, f.husband?.motherName, f.husband?.caste,
+      f.wife?.nameUrdu, f.wife?.fatherName, f.wife?.motherName, f.wife?.caste,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return haystack.includes(q);
   });
 
   function startEdit(f: Family) {

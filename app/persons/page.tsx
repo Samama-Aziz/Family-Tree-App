@@ -204,11 +204,12 @@ export default function PersonsPage() {
   };
 
   const filteredPersons = (persons || []).filter((p) => {
-    const s = searchQuery.toLowerCase();
-    const matchSearch = p.name.toLowerCase().includes(s) || 
-                       p.displayId.toLowerCase().includes(s) || 
-                       p.fatherName?.toLowerCase().includes(s);
-    return matchSearch;
+    const s = searchQuery.toLowerCase().trim();
+    const haystack = [p.name, p.nameUrdu, p.displayId, p.gender, p.fatherName, p.motherName, p.caste]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(s);
   });
 
   const pendingCount = (pendingItems || []).filter(p => p.status === "pending").length;
@@ -312,7 +313,22 @@ export default function PersonsPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Caste</label>
-                <input name="caste" value={form.caste || ""} onChange={handleChange} placeholder="Caste" className="input-field w-full min-h-[44px] h-[44px]" />
+                <input
+                  name="caste"
+                  list="caste-options"
+                  value={form.caste || ""}
+                  onChange={handleChange}
+                  placeholder="Select or type caste..."
+                  className="input-field w-full min-h-[44px] h-[44px]"
+                />
+                <datalist id="caste-options">
+                  <option value="Arayan" />
+                  <option value="Baig" />
+                  <option value="Chohan" />
+                  <option value="Khokhar" />
+                  <option value="Khan" />
+                  <option value="Mughal" />
+                </datalist>
               </div>
 
               <div className="flex items-center gap-3 pt-5">
@@ -418,11 +434,37 @@ export default function PersonsPage() {
                             </div>
                             <div className="font-bold text-slate-900 break-words">{p.name}</div>
                             {p.nameUrdu && <div className="text-sm text-slate-600 font-urdu mt-0.5" dir="rtl">{p.nameUrdu}</div>}
-                            <div className="text-xs text-slate-500 mt-2 space-y-1">
-                              {p.dob && <div className="flex justify-between border-b border-slate-50 pb-1"><span>Born:</span> <span className="font-medium">{formatDate(p.dob)}</span></div>}
-                              {!p.isAlive && p.dod && <div className="flex justify-between border-b border-slate-50 pb-1 text-red-500"><span>Died:</span> <span className="font-medium">{formatDate(p.dod)}</span></div>}
-                              {p.fatherName && <div className="flex justify-between border-b border-slate-50 pb-1"><span>Father:</span> <span className="font-medium truncate ml-2">{p.fatherName}</span></div>}
-                              {p.caste && <div className="flex justify-between border-b border-slate-50 pb-1"><span>Caste:</span> <span className="font-medium">{p.caste}</span></div>}
+                            <div className="text-xs text-slate-500 mt-2 p-3 bg-slate-50/50 rounded-xl border border-slate-100 space-y-2">
+                              {p.dob && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Born</span>
+                                  <span className="font-semibold text-slate-700 text-xs">{formatDate(p.dob)}</span>
+                                </div>
+                              )}
+                              {!p.isAlive && p.dod && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-rose-400 uppercase tracking-widest text-[9px]">Passed</span>
+                                  <span className="font-semibold text-rose-600 text-xs">{formatDate(p.dod)}</span>
+                                </div>
+                              )}
+                              {p.fatherName && (
+                                <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Father</span>
+                                  <span className="italic px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 ring-1 ring-blue-100 text-[11px] truncate ml-4">{p.fatherName}</span>
+                                </div>
+                              )}
+                              {p.motherName && (
+                                <div className="flex items-center justify-between pt-1">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Mother</span>
+                                  <span className="italic px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 ring-1 ring-pink-100 text-[11px] truncate ml-4">{p.motherName}</span>
+                                </div>
+                              )}
+                              {p.caste && (
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Caste</span>
+                                  <span className="font-medium text-slate-600 text-[11px]">{p.caste}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                           {isAdmin && (
@@ -446,7 +488,7 @@ export default function PersonsPage() {
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">ID</th>
                           <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Member Name</th>
-                          <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Birth</th>
+                          <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Date of Birth</th>
                           <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Caste</th>
                           <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Parents</th>
                           <th className="px-6 py-3 font-bold text-slate-600 uppercase tracking-wider text-xs">Status</th>
@@ -460,22 +502,55 @@ export default function PersonsPage() {
                               <span className="font-mono font-bold text-brand-primary text-xs">{p.displayId}</span>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="font-bold text-slate-900 flex items-baseline gap-2">
+                              <div className="font-bold text-slate-900 flex items-center gap-2">
                                 <span>{p.name}</span>
-                                {p.nameUrdu && <span className="text-xs text-slate-600 font-urdu" dir="rtl">({p.nameUrdu})</span>}
+                                {p.nameUrdu && <span className="text-xs text-slate-500 font-urdu" dir="rtl">({p.nameUrdu})</span>}
                               </div>
-                              <div className="text-xs text-slate-400 mt-1">{p.gender}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${p.gender === "Male" ? "text-blue-600 bg-blue-50" : "text-pink-600 bg-pink-50"}`}>{p.gender}</span>
+                                {p.submittedByName && (
+                                  <span className="text-[10px] font-medium text-slate-400">by {p.submittedByName}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-2">
+                                {p.dob && (
+                                  <div>
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Born</div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-slate-600 font-semibold text-sm tabular-nums">{formatDate(p.dob)}</span>
+                                      <span className="text-[10px] font-bold text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded">Age: {p.age}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {!p.isAlive && p.dod && (
+                                  <div>
+                                    <div className="text-[9px] font-bold text-rose-400 uppercase tracking-widest leading-none mb-1">Passed</div>
+                                    <div className="text-rose-500 font-semibold text-sm tabular-nums">{formatDate(p.dod)}</div>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-sm">
-                              {p.dob && <div className="text-slate-700">{formatDate(p.dob)}</div>}
-                              {!p.isAlive && p.dod && <div className="text-xs text-red-500">Died: {formatDate(p.dod)}</div>}
+                              <span className="text-slate-600 font-bold">{p.caste ?? "—"}</span>
                             </td>
-                            <td className="px-6 py-4 text-sm">
-                              <span className="text-slate-700">{p.caste ?? "—"}</span>
-                            </td>
-                            <td className="px-6 py-4 text-xs">
-                              <div><span className="text-slate-500">Father:</span> {p.fatherName || "Unknown"}</div>
-                              <div><span className="text-slate-500">Mother:</span> {p.motherName || "Unknown"}</div>
+                            <td className="px-6 py-4 text-xs font-medium text-slate-600">
+                              <div className="space-y-1">
+                                {p.fatherName && (
+                                  <div>
+                                    <span className="font-semibold uppercase text-blue-600 text-[10px] mr-2">Father:</span>
+                                    <span className="text-slate-400 font-bold ">{p.fatherName}</span>
+                                  </div>
+                                )}
+                                {p.motherName && (
+                                  <div>
+                                    <span className="font-semibold uppercase text-pink-600 text-[10px] mr-2">Mother:</span>
+                                    <span className="text-slate-400 font-bold ">{p.motherName}</span>
+                                  </div>
+                                )}
+                                {!p.fatherName && !p.motherName && <span>—</span>}
+                              </div>
                             </td>
                             <td className="px-6 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${p.isAlive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
