@@ -114,7 +114,7 @@ function SearchablePersonSelect({
       <label className="text-sm font-bold text-slate-700 ml-1">{label}</label>
       <div className="relative">
         <input
-          value={open ? query : (selected ? personLabel(selected) : query)}
+          value={open ? query : (selected ? personLabel(selected) : (query || ""))}
           onFocus={() => { setOpen(true); setQuery(selected ? personLabel(selected) : query); }}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); if (value) onChange(""); }}
           placeholder={placeholder}
@@ -331,17 +331,39 @@ function ChildCard({
 export default function FamiliesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const [hasHydrated, setHasHydrated] = useState(false);
 
-  const { data: families = [], mutate: mutateFamilies, isLoading: isLoadingFamilies } = useSWR<Family[]>("/api/families", fetcher, {
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
+  const { data: familiesData = [], mutate: mutateFamilies, isLoading: isLoadingFamilies } = useSWR<Family[]>("/api/families", fetcher, {
     revalidateOnFocus: false, dedupingInterval: 30000,
+    onSuccess: (data) => { if (Array.isArray(data)) localStorage.setItem("cache_families", JSON.stringify(data)); }
   });
-  const { data: persons = [] } = useSWR<Person[]>("/api/persons", fetcher, {
+  
+  const families = (Array.isArray(familiesData) && familiesData.length > 0) || !hasHydrated ? familiesData : (() => {
+    if (typeof window === "undefined") return [];
+    const cached = localStorage.getItem("cache_families");
+    return cached ? JSON.parse(cached) : [];
+  })();
+
+  const { data: personsData = [] } = useSWR<Person[]>("/api/persons", fetcher, {
     revalidateOnFocus: false, dedupingInterval: 30000,
+    onSuccess: (data) => { if (Array.isArray(data)) localStorage.setItem("cache_persons", JSON.stringify(data)); }
   });
-  const { data: pendingFamilies = [], mutate: mutatePendingFamilies, isLoading: isLoadingPending } = useSWR<PendingFamily[]>(
+
+  const persons = (Array.isArray(personsData) && personsData.length > 0) || !hasHydrated ? personsData : (() => {
+    if (typeof window === "undefined") return [];
+    const cached = localStorage.getItem("cache_persons");
+    return cached ? JSON.parse(cached) : [];
+  })();
+
+  const { data: pendingFamiliesData = [], mutate: mutatePendingFamilies, isLoading: isLoadingPending } = useSWR<PendingFamily[]>(
     !isAdmin ? "/api/pending/families" : null, fetcher,
     { revalidateOnFocus: false, dedupingInterval: 30000 }
   );
+  const pendingFamilies = Array.isArray(pendingFamiliesData) ? pendingFamiliesData : [];
 
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState<string | null>(null);
@@ -354,9 +376,9 @@ export default function FamiliesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
-  const selectedPerson = persons.find((p) => p.id === selectedPersonId) ?? null;
+  const selectedPerson = persons.find((p: Person) => p.id === selectedPersonId) ?? null;
 
-  const filteredFamilies = families.filter((f) => {
+  const filteredFamilies = families.filter((f: Family) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase().trim();
     const haystack = [
@@ -420,10 +442,10 @@ export default function FamiliesPage() {
     void mutateFamilies();
   }
 
-  const males = persons.filter((p) => p.gender === "Male");
-  const females = persons.filter((p) => p.gender === "Female");
-  const pendingCount = pendingFamilies.filter((f) => f.status === "pending").length;
-  const rejectedCount = pendingFamilies.filter((f) => f.status === "rejected").length;
+  const males = persons.filter((p: Person) => p.gender === "Male");
+  const females = persons.filter((p: Person) => p.gender === "Female");
+  const pendingCount = pendingFamilies.filter((f: PendingFamily) => f.status === "pending").length;
+  const rejectedCount = pendingFamilies.filter((f: PendingFamily) => f.status === "rejected").length;
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-20">
@@ -535,7 +557,7 @@ export default function FamiliesPage() {
                   </p>
                   {!searchQuery && !isAdmin && <p className="text-sm text-slate-400">Submit a family record — it will appear here after admin approval.</p>}
                 </div>
-              ) : filteredFamilies.map((f) => (
+              ) : filteredFamilies.map((f: Family) => (
                 <div key={f.id} className="glass-card overflow-hidden group hover:shadow-md hover:border-brand-primary/20 transition-all duration-300">
                   <div className="px-6 md:px-8 pt-4 pb-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent flex items-center justify-between gap-4">
                     <div className="text-xs text-brand-primary font-mono font-bold">ID: {f.displayId}</div>
@@ -587,7 +609,7 @@ export default function FamiliesPage() {
                               <ChildCard
                                 key={s.id}
                                 person={s}
-                                full={persons.find((p) => p.id === s.id)}
+                                full={persons.find((p: Person) => p.id === s.id)}
                                 accent="blue"
                               />
                             ))}
@@ -609,7 +631,7 @@ export default function FamiliesPage() {
                               <ChildCard
                                 key={d.id}
                                 person={d}
-                                full={persons.find((p) => p.id === d.id)}
+                                full={persons.find((p: Person) => p.id === d.id)}
                                 accent="pink"
                               />
                             ))}
@@ -656,8 +678,8 @@ export default function FamiliesPage() {
                 <button onClick={() => setShowForm(true)} className="text-brand-primary font-bold hover:underline text-sm">Submit your first family connection</button>
               </div>
             ) : pendingFamilies.map((f) => {
-              const sons = f.sonIds.map((id) => persons.find((p) => p.id === id)).filter(Boolean) as typeof persons;
-              const daughters = f.daughterIds.map((id) => persons.find((p) => p.id === id)).filter(Boolean) as typeof persons;
+              const sons = f.sonIds.map((id) => persons.find((p: Person) => p.id === id)).filter(Boolean) as typeof persons;
+              const daughters = f.daughterIds.map((id) => persons.find((p: Person) => p.id === id)).filter(Boolean) as typeof persons;
               return (
                 <div key={f.id} className="glass-card overflow-hidden">
 
@@ -707,7 +729,7 @@ export default function FamiliesPage() {
                           </p>
                           {sons.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
-                              {sons.map((s) => (
+                              {sons.map((s: Person) => (
                                 <span key={s.id} className="inline-flex items-baseline gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded-xl border border-blue-100">
                                   <span>{s.name}</span>
                                   {s.nameUrdu && <span className="text-[11px] font-urdu text-blue-400" dir="rtl">{s.nameUrdu}</span>}
@@ -724,7 +746,7 @@ export default function FamiliesPage() {
                           </p>
                           {daughters.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
-                              {daughters.map((d) => (
+                              {daughters.map((d: Person) => (
                                 <span key={d.id} className="inline-flex items-baseline gap-1 px-2.5 py-1 bg-pink-50 text-pink-700 text-xs font-semibold rounded-xl border border-pink-100">
                                   <span>{d.name}</span>
                                   {d.nameUrdu && <span className="text-[11px] font-urdu text-pink-400" dir="rtl">{d.nameUrdu}</span>}

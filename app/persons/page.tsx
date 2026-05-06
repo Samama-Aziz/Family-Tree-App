@@ -63,9 +63,15 @@ function StatusBadge({ status, reason }: { status: string; reason?: string | nul
 export default function PersonsPage() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [pendingItems, setPendingItems] = useState<Person[]>([]);
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [user, setUser] = useState<{ id: string; role: string } | null>(null);
   const [isLoadingPersons, setIsLoadingPersons] = useState(true);
   const [isLoadingPending, setIsLoadingPending] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editId, setEditId] = useState<string | null>(null);
@@ -80,9 +86,24 @@ export default function PersonsPage() {
   const [deleteType, setDeleteType] = useState<"approved" | "pending" | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showUrduKeyboard, setShowUrduKeyboard] = useState(false);
+  const [fatherNames, setFatherNames] = useState<string[]>([]);
+  const [motherNames, setMotherNames] = useState<string[]>([]);
 
   const isAdmin = user?.role === "admin";
   const closeKeyboard = useCallback(() => setShowUrduKeyboard(false), []);
+
+  const extractUniqueNames = useCallback((personsList: Person[]) => {
+    const fathers = new Set<string>();
+    const mothers = new Set<string>();
+    
+    personsList.forEach((p) => {
+      if (p.fatherName) fathers.add(p.fatherName);
+      if (p.motherName) mothers.add(p.motherName);
+    });
+    
+    setFatherNames(Array.from(fathers).sort());
+    setMotherNames(Array.from(mothers).sort());
+  }, []);
 
   const loadUser = useCallback(async () => {
     const res = await fetch("/api/auth/me");
@@ -90,31 +111,50 @@ export default function PersonsPage() {
   }, []);
 
   const loadPersons = useCallback(async () => {
-    setIsLoadingPersons(true);
     const res = await fetch("/api/persons");
-    if (res.ok) setPersons(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : [];
+      setPersons(arr);
+      extractUniqueNames(arr);
+      localStorage.setItem("cache_persons", JSON.stringify(arr));
+    }
     setIsLoadingPersons(false);
-  }, []);
+  }, [extractUniqueNames]);
 
   const loadPending = useCallback(async () => {
     if (isAdmin) return;
-    setIsLoadingPending(true);
     const res = await fetch("/api/pending/persons");
-    if (res.ok) setPendingItems(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setPendingItems(Array.isArray(data) ? data : []);
+    }
     setIsLoadingPending(false);
   }, [isAdmin]);
 
   useEffect(() => {
     const init = async () => {
+      // Load from cache first
+      const cached = localStorage.getItem("cache_persons");
+      if (cached && hasHydrated) {
+        setPersons(JSON.parse(cached));
+        setIsLoadingPersons(false);
+      } else if (!hasHydrated) {
+        // Wait for hydration
+      } else {
+        setIsLoadingPersons(true);
+      }
+      
       await loadUser();
       await loadPersons();
     };
     init().catch(console.error);
-  }, [loadUser, loadPersons]);
+  }, [loadUser, loadPersons, hasHydrated]);
 
   useEffect(() => {
     const initPending = async () => {
       if (user && !isAdmin) {
+        setIsLoadingPending(true);
         await loadPending();
       }
     };
@@ -146,8 +186,8 @@ export default function PersonsPage() {
       name: p.name,
       nameUrdu: p.nameUrdu || "",
       gender: p.gender as "Male" | "Female",
-      dob: p.dob || "",
-      dod: p.dod || "",
+      dob: p.dob ? new Date(p.dob).toISOString().split("T")[0] : "",
+      dod: p.dod ? new Date(p.dod).toISOString().split("T")[0] : "",
       fatherName: p.fatherName || "",
       motherName: p.motherName || "",
       caste: p.caste || "",
@@ -303,12 +343,38 @@ export default function PersonsPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Father&apos;s Full Name *</label>
-                <input name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Father&apos;s full name" required className="input-field w-full min-h-[44px] h-[44px]" />
+                <input
+                  name="fatherName"
+                  list="father-names"
+                  value={form.fatherName}
+                  onChange={handleChange}
+                  placeholder="Father&apos;s full name"
+                  required
+                  className="input-field w-full min-h-[44px] h-[44px]"
+                />
+                <datalist id="father-names">
+                  {fatherNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Mother&apos;s Full Name *</label>
-                <input name="motherName" value={form.motherName} onChange={handleChange} placeholder="Mother&apos;s full name" required className="input-field w-full min-h-[44px] h-[44px]" />
+                <input
+                  name="motherName"
+                  list="mother-names"
+                  value={form.motherName}
+                  onChange={handleChange}
+                  placeholder="Mother&apos;s full name"
+                  required
+                  className="input-field w-full min-h-[44px] h-[44px]"
+                />
+                <datalist id="mother-names">
+                  {motherNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">

@@ -63,15 +63,34 @@ export default function AdminPersonsPage() {
   const [showUrduKeyboard, setShowUrduKeyboard] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [fatherNames, setFatherNames] = useState<string[]>([]);
+  const [motherNames, setMotherNames] = useState<string[]>([]);
 
   const closeKeyboard = useCallback(() => setShowUrduKeyboard(false), []);
+
+  const extractUniqueNames = useCallback((personsList: PendingPerson[]) => {
+    const fathers = new Set<string>();
+    const mothers = new Set<string>();
+    
+    personsList.forEach((p) => {
+      if (p.fatherName) fathers.add(p.fatherName);
+      if (p.motherName) mothers.add(p.motherName);
+    });
+    
+    setFatherNames(Array.from(fathers).sort());
+    setMotherNames(Array.from(mothers).sort());
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/admin/pending/persons");
-    if (res.ok) setItems(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      setItems(data);
+      extractUniqueNames(data);
+    }
     setLoading(false);
-  }, []);
+  }, [extractUniqueNames]);
 
   useEffect(() => {
     const run = async () => {
@@ -235,12 +254,38 @@ export default function AdminPersonsPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Father&apos;s Full Name *</label>
-                <input name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Father's full name" required className="input-field w-full min-h-[44px] h-[44px]" />
+                <input
+                  name="fatherName"
+                  list="admin-father-names"
+                  value={form.fatherName}
+                  onChange={handleChange}
+                  placeholder="Father's full name"
+                  required
+                  className="input-field w-full min-h-[44px] h-[44px]"
+                />
+                <datalist id="admin-father-names">
+                  {fatherNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-bold text-slate-700 ml-1">Mother&apos;s Full Name *</label>
-                <input name="motherName" value={form.motherName} onChange={handleChange} placeholder="Mother's full name" required className="input-field w-full min-h-[44px] h-[44px]" />
+                <input
+                  name="motherName"
+                  list="admin-mother-names"
+                  value={form.motherName}
+                  onChange={handleChange}
+                  placeholder="Mother's full name"
+                  required
+                  className="input-field w-full min-h-[44px] h-[44px]"
+                />
+                <datalist id="admin-mother-names">
+                  {motherNames.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">

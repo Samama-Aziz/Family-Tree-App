@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useRef } from "react";
 import { formatDate } from "@/lib/format-date";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 type Person = { id: string; name: string; nameUrdu?: string | null; gender: string; fatherName?: string | null; motherName?: string | null; caste?: string | null };
 
@@ -231,42 +232,42 @@ function TreeView({
         {node.children!.length === 2 ? (
           // Father + Mother couple pair — shown side-by-side with +
           <div className="relative flex gap-3 items-end px-4">
-            <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-200" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-400" />
             <div className="flex flex-col items-center">
               <TreeView node={node.children![0]} direction={direction} onPersonClick={onPersonClick} />
-              <div className="w-px h-8 bg-slate-200" />
+              <div className="w-0.5 h-8 bg-slate-400" />
             </div>
             <span className="text-slate-300 text-2xl font-thin mb-8 select-none flex-shrink-0">+</span>
             <div className="flex flex-col items-center">
               <TreeView node={node.children![1]} direction={direction} onPersonClick={onPersonClick} />
-              <div className="w-px h-8 bg-slate-200" />
+              <div className="w-0.5 h-8 bg-slate-400" />
             </div>
           </div>
         ) : (
           <div className="relative flex gap-10 items-end px-4">
             {node.children!.length > 1 && (
-              <div className="absolute bottom-0 left-4 right-4 h-px bg-slate-200" />
+              <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-slate-400" />
             )}
             {node.children!.map((child, i) => (
               <div key={child.id + i} className="flex flex-col items-center">
                 <TreeView node={child} direction={direction} onPersonClick={onPersonClick} />
-                <div className="w-px h-8 bg-slate-200" />
+                <div className="w-0.5 h-8 bg-slate-400" />
               </div>
             ))}
           </div>
         )}
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-0.5 h-5 bg-slate-400" />
       </>
     ) : (
       <>
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-0.5 h-5 bg-slate-400" />
         <div className="relative flex gap-10 items-start px-4">
           {node.children!.length > 1 && (
-            <div className="absolute top-0 left-4 right-4 h-px bg-slate-200" />
+            <div className="absolute top-0 left-4 right-4 h-0.5 bg-slate-400" />
           )}
           {node.children!.map((child, i) => (
             <div key={child.id + i} className="flex flex-col items-center">
-              <div className="w-px h-8 bg-slate-200" />
+              <div className="w-0.5 h-8 bg-slate-400" />
               <TreeView node={child} direction={direction} onPersonClick={onPersonClick} />
             </div>
           ))}
@@ -306,10 +307,18 @@ export default function FamilyTreePage() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [detailPersonId, setDetailPersonId] = useState<string | null>(null);
+  const [slowNetwork, setSlowNetwork] = useState(false);
   const personSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/persons").then((r) => r.json()).then(setPersons);
+    // Load from cache first
+    const cached = localStorage.getItem("cache_persons");
+    if (cached) setPersons(JSON.parse(cached));
+
+    fetch("/api/persons").then((r) => r.json()).then((data) => {
+      setPersons(data);
+      if (Array.isArray(data)) localStorage.setItem("cache_persons", JSON.stringify(data));
+    });
   }, []);
 
   useEffect(() => {
@@ -334,11 +343,26 @@ const filteredPersons = persons.filter((p) => {
   function handleGenerate() {
     if (!selectedId) return;
     setError("");
+    setSlowNetwork(false);
+    
+    // Set a timeout to warn about slow network
+    const slowNetworkTimer = setTimeout(() => {
+      setSlowNetwork(true);
+    }, 2000);
+
     startTransition(async () => {
-      const res = await fetch(`/api/family-tree/${selectedId}?direction=${direction}`);
-      if (!res.ok) { setError("Failed to load tree"); return; }
-      const data = await res.json();
-      setTree(data.tree);
+      try {
+        const res = await fetch(`/api/family-tree/${selectedId}?direction=${direction}`);
+        clearTimeout(slowNetworkTimer);
+        setSlowNetwork(false);
+        
+        if (!res.ok) { setError("Failed to load tree"); return; }
+        const data = await res.json();
+        setTree(data.tree);
+      } catch (err) {
+        clearTimeout(slowNetworkTimer);
+        setError("Failed to load tree");
+      }
     });
   }
 
@@ -476,12 +500,17 @@ const filteredPersons = persons.filter((p) => {
               {error}
             </div>
           )}
+          {slowNetwork && (
+            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-700 text-sm font-medium">
+              ⏳ Generating family tree... This may take a moment depending on the family size.
+            </div>
+          )}
         </div>
 
         {/* Tree */}
         {tree ? (
-          <div className="glass-card p-4 sm:p-6 md:p-10 lg:p-12 overflow-x-auto overflow-y-visible animate-slide-up" style={{ animationDelay: "100ms" }}>
-            <div className="mb-12 text-center">
+          <div className="glass-card overflow-hidden animate-slide-up" style={{ animationDelay: "100ms" }}>
+            <div className="p-8 pb-0 text-center">
               <div className="inline-block px-4 py-1.5 rounded-full bg-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">
                 {direction === "downward" ? "Descendant Chart" : "Ancestry Chart"}
               </div>
@@ -493,7 +522,7 @@ const filteredPersons = persons.filter((p) => {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center gap-6 mb-10 text-xs text-slate-400 font-semibold">
+            <div className="flex items-center justify-center gap-6 mt-6 mb-4 text-xs text-slate-400 font-semibold bg-white/50 backdrop-blur-sm py-2 px-4 rounded-full mx-auto w-fit border border-slate-100">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-full bg-blue-200 border-2 border-blue-300 inline-block" /> Male
               </span>
@@ -503,19 +532,64 @@ const filteredPersons = persons.filter((p) => {
               <span className="flex items-center gap-1.5">
                 <span className="text-slate-300 font-thin text-base">+</span> Couple
               </span>
-              <span className="flex items-center gap-1.5 text-slate-300">
-                <span className="w-3 h-3 rounded border border-slate-300 inline-block" />
-                Click any card for details
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Zoom/Pan enabled
               </span>
             </div>
 
-            <div className="flex justify-center min-w-max pb-8">
-              <TreeView
-                node={tree}
-                isRoot
-                direction={direction}
-                onPersonClick={setDetailPersonId}
-              />
+            <div className="relative h-[600px] border-t border-slate-100 bg-slate-50/30">
+              <TransformWrapper
+                initialScale={0.8}
+                minScale={0.1}
+                maxScale={2}
+                centerOnInit={true}
+                limitToBounds={false}
+                wheel={{ disabled: true }}
+                doubleClick={{ disabled: true }}
+                panning={{ velocityDisabled: true }}
+              >
+                {({ zoomIn, zoomOut, resetTransform }) => (
+                  <>
+                    <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+                      <button onClick={() => zoomIn()} className="w-10 h-10 bg-white shadow-md rounded-lg flex items-center justify-center hover:bg-slate-50 text-slate-600 border border-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                      <button onClick={() => zoomOut()} className="w-10 h-10 bg-white shadow-md rounded-lg flex items-center justify-center hover:bg-slate-50 text-slate-600 border border-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </button>
+                      <button onClick={() => resetTransform()} className="w-10 h-10 bg-white shadow-md rounded-lg flex items-center justify-center hover:bg-slate-50 text-slate-600 border border-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
+                      </button>
+                    </div>
+
+                    <TransformComponent
+                      wrapperStyle={{
+                        width: "100%",
+                        height: "100%",
+                        cursor: "grab",
+                      }}
+                      contentStyle={{
+                        padding: "100px",
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        minWidth: "100%",
+                        minHeight: "100%",
+                      }}
+                    >
+                      <div className="flex justify-center flex-shrink-0">
+                        <TreeView
+                          node={tree}
+                          isRoot
+                          direction={direction}
+                          onPersonClick={setDetailPersonId}
+                        />
+                      </div>
+                    </TransformComponent>
+                  </>
+                )}
+              </TransformWrapper>
             </div>
           </div>
         ) : (
