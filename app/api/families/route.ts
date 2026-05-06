@@ -11,15 +11,30 @@ export async function GET(request: NextRequest) {
     const where = auth.role === "admin" ? {} : { submittedBy: auth.userId };
     const families = await prisma.family.findMany({ where, orderBy: { husbandName: "asc" } });
 
-    const enrichedFamilies = await Promise.all(
-      families.map(async (family) => {
-        const husband = await prisma.person.findUnique({ where: { id: family.husbandId } });
-        const wife = await prisma.person.findUnique({ where: { id: family.wifeId } });
-        const sons = await prisma.person.findMany({ where: { id: { in: family.sonIds } } });
-        const daughters = await prisma.person.findMany({ where: { id: { in: family.daughterIds } } });
-        return { ...family, husband, wife, sons, daughters };
-      })
+    // Collect all person IDs to fetch in one batch query
+    const allPersonIds = new Set<string>();
+    families.forEach((family) => {
+      allPersonIds.add(family.husbandId);
+      allPersonIds.add(family.wifeId);
+      family.sonIds.forEach((id) => allPersonIds.add(id));
+      family.daughterIds.forEach((id) => allPersonIds.add(id));
+    });
+
+    // Fetch all persons in a single query
+    const personsMap = new Map(
+      (await prisma.person.findMany({ where: { id: { in: Array.from(allPersonIds) } } })).map(
+        (p) => [p.id, p]
+      )
     );
+
+    // Enrich families with cached person data (no additional queries)
+    const enrichedFamilies = families.map((family) => ({
+      ...family,
+      husband: personsMap.get(family.husbandId) || null,
+      wife: personsMap.get(family.wifeId) || null,
+      sons: family.sonIds.map((id) => personsMap.get(id)).filter(Boolean),
+      daughters: family.daughterIds.map((id) => personsMap.get(id)).filter(Boolean),
+    }));
 
     return Response.json(enrichedFamilies);
   } catch (error) {
