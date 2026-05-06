@@ -14,7 +14,14 @@ const SESSION_DURATION = "30d";
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET env var is not set");
+  if (!secret) {
+    // In development, use a default; in production, this will cause issues
+    if (process.env.NODE_ENV === "development") {
+      console.warn("⚠️  AUTH_SECRET not set - using default for development only");
+      return new TextEncoder().encode("dev-secret-key-change-in-production");
+    }
+    throw new Error("AUTH_SECRET env var is not set. Please configure it in your environment variables.");
+  }
   return new TextEncoder().encode(secret);
 }
 
