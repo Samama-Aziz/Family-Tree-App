@@ -21,8 +21,16 @@ const notoNastaliqUrdu = Noto_Nastaliq_Urdu({
 });
 
 export const metadata: Metadata = {
-  title: "Family Tree App",
-  description: "Manage and visualize your family tree",
+  title: "Family Tree",
+  description: "Explore and manage your family lineage",
+  icons: {
+    icon: [
+      {
+        url: "/icon.svg",
+        type: "image/svg+xml",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition, useRef } from "react";
+import { useState, useEffect, useTransition, useRef, memo } from "react";
 import { formatDate } from "@/lib/format-date";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useAuth } from "@/components/AuthContext";
@@ -36,6 +36,10 @@ type TreeNode = PersonSnap & {
   partner?: PersonSnap;
   children?: TreeNode[];
 };
+
+// Tree cache with key = `${personId}:${direction}`
+const treeCache = new Map<string, { tree: TreeNode; timestamp: number }>();
+const CACHE_DURATION = 3600000; // 1 hour
 
 // ── Person detail modal ──────────────────────────────────────────────────────
 
@@ -136,7 +140,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 // ── Individual person card ───────────────────────────────────────────────────
 
-function PersonCard({
+const PersonCard = memo(function PersonCard({
   node,
   isRoot = false,
   onPersonClick,
@@ -188,24 +192,27 @@ function PersonCard({
       </div>
     </div>
   );
-}
+});
 
 // ── Recursive tree node ──────────────────────────────────────────────────────
 
-function TreeView({
+const TreeView = memo(function TreeView({
   node,
   isRoot = false,
   direction,
   onPersonClick,
   isAdmin = false,
+  depth = 0,
 }: {
   node: TreeNode;
   isRoot?: boolean;
   direction: "upward" | "downward";
   onPersonClick: (id: string) => void;
   isAdmin?: boolean;
+  depth?: number;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapse by default if depth > 2
+  const [collapsed, setCollapsed] = useState(depth > 2 ? true : false);
 
   const hasChildren = (node.children?.length ?? 0) > 0;
   const isUp = direction === "upward";
@@ -271,6 +278,7 @@ function TreeView({
                   direction={direction}
                   onPersonClick={onPersonClick}
                   isAdmin={isAdmin}
+                  depth={depth + 1}
                 />
 
                 {/* Vertical connector */}
@@ -307,6 +315,7 @@ function TreeView({
                   direction={direction}
                   onPersonClick={onPersonClick}
                   isAdmin={isAdmin}
+                  depth={depth + 1}
                 />
               </div>
             ))}
@@ -346,7 +355,7 @@ function TreeView({
       {childrenBlock}
     </div>
   );
-}
+});
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
@@ -411,6 +420,14 @@ const filteredPersons = persons.filter((p) => {
     setError("");
     setSlowNetwork(false);
     
+    // Check cache first
+    const cacheKey = `${selectedId}:${direction}`;
+    const cached = treeCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      setTree(cached.tree);
+      return;
+    }
+    
     // Set a timeout to warn about slow network
     const slowNetworkTimer = setTimeout(() => {
       setSlowNetwork(true);
@@ -425,6 +442,9 @@ const filteredPersons = persons.filter((p) => {
         if (!res.ok) { setError("Failed to load tree"); return; }
         const data = await res.json();
         setTree(data.tree);
+        
+        // Cache the result
+        treeCache.set(cacheKey, { tree: data.tree, timestamp: Date.now() });
       } catch (err) {
         clearTimeout(slowNetworkTimer);
         setError("Failed to load tree");
