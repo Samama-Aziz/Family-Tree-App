@@ -26,10 +26,7 @@ export default function Home() {
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link href="/family-tree" className="btn-primary px-8 py-3 text-base">
-              View Your Tree
-            </Link>
-            <Link href="/persons" className="btn-outline px-8 py-3 text-base">
-              Manage Persons
+              Explore Family Tree
             </Link>
           </div>
         </div>
@@ -41,9 +38,9 @@ export default function Home() {
               <h2 className="text-3xl font-bold text-slate-900">Simple Guide</h2>
               <div className="space-y-4">
                 {[
-                  { step: "1", text: "Add Persons with details and parents" },
-                  { step: "2", text: "Create Family Links for couples" },
-                  { step: "3", text: "Visualize and Explore the Tree" },
+                  { step: "1", text: "Search for a person from the family" },
+                  { step: "2", text: "Choose Descendants or Ancestors view" },
+                  { step: "3", text: "Generate and explore the family tree" },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 border border-blue-100 flex items-center justify-center font-bold flex-shrink-0 text-sm">
@@ -56,7 +53,7 @@ export default function Home() {
             </div>
             <div className="bg-slate-50 rounded-2xl p-6 border border-dashed border-slate-300">
               <p className="text-sm text-slate-500 leading-relaxed">
-                <span className="font-semibold text-slate-700">Pro tip:</span> Ensure parent names match exactly between records to automatically build the visualization. Our smart linking system does the rest!
+                <span className="font-semibold text-slate-700">No login needed.</span> The family tree is open to everyone. Use the zoom and pan controls to navigate large trees, and collapse branches to focus on specific lineages.
               </p>
             </div>
           </div>

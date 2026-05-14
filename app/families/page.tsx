@@ -309,7 +309,7 @@ function ChildCard({
         </span>
         {isAlive !== undefined && (
           <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md ${isAlive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-            {isAlive ? "Living" : "Deceased"}
+            {isAlive ? "Alive" : "Deceased"}
           </span>
         )}
       </div>
@@ -576,8 +576,8 @@ export default function FamiliesPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Husband</p>
-                            <p className="text-base font-bold text-slate-900">{f.husbandName}</p>
-                            {f.husband?.nameUrdu && <p className="text-sm text-slate-500 font-urdu leading-relaxed" dir="rtl">{f.husband.nameUrdu}</p>}
+                            <p className="text-base font-bold text-slate-900">{f.husband?.name}</p>
+                            {f.husband?.nameUrdu && <p className="text-sm text-slate-500 font-urdu leading-relaxed mt-1" dir="rtl">{f.husband.nameUrdu}</p>}
                           </div>
                         </div>
                         <div className="ml-5 border-l-2 border-slate-200 h-4" />
@@ -587,8 +587,8 @@ export default function FamiliesPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Wife</p>
-                            <p className="text-base font-bold text-slate-900">{f.wifeName}</p>
-                            {f.wife?.nameUrdu && <p className="text-sm text-slate-500 font-urdu leading-relaxed" dir="rtl">{f.wife.nameUrdu}</p>}
+                            <p className="text-base font-bold text-slate-900">{f.wife?.name}</p>
+                            {f.wife?.nameUrdu && <p className="text-sm text-slate-500 font-urdu leading-relaxed mt-1" dir="rtl">{f.wife.nameUrdu}</p>}
                           </div>
                         </div>
                       </div>

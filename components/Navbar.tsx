@@ -5,15 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./AuthContext";
 
-const userLinks = [
-  { href: "/", label: "Home" },
-  { href: "/persons", label: "Persons" },
-  { href: "/families", label: "Families" },
+const publicLinks = [
   { href: "/family-tree", label: "Family Tree" },
 ];
 
 const adminLinks = [
-  { href: "/", label: "Home" },
   { href: "/admin", label: "Admin" },
   { href: "/persons", label: "Persons" },
   { href: "/families", label: "Families" },
@@ -25,7 +21,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, loading, logout } = useAuth();
 
-  const links = user?.role === "admin" ? adminLinks : userLinks;
+  const links = user?.role === "admin" ? adminLinks : publicLinks;
 
   return (
     <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
@@ -39,7 +35,7 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
-            {links.map((link) => {
+            {links.map((link: { href: string; label: string }) => {
               const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
               return (
                 <Link
@@ -75,14 +71,9 @@ export default function Navbar() {
                     </button>
                   </>
                 ) : (
-                  <>
-                    <Link href="/login" className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-all">
-                      Login
-                    </Link>
-                    <Link href="/register" className="btn-primary !py-2 !text-sm">
-                      Register
-                    </Link>
-                  </>
+                  <Link href="/login" className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-all border border-slate-200">
+                    Admin Login
+                  </Link>
                 )}
               </div>
             )}
@@ -104,7 +95,7 @@ export default function Navbar() {
       {/* Mobile Dropdown */}
       <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out border-t border-slate-200 bg-white shadow-lg ${menuOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
         <div className="px-4 py-3 space-y-1 max-w-7xl mx-auto">
-          {links.map((link) => {
+          {links.map((link: { href: string; label: string }) => {
             const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
             return (
               <Link
@@ -140,14 +131,13 @@ export default function Navbar() {
                   </button>
                 </>
               ) : (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <Link href="/login" onClick={() => setMenuOpen(false)} className="flex items-center justify-center px-4 py-3 rounded-xl text-sm font-bold text-slate-600 bg-slate-50 border border-slate-100">
-                    Login
-                  </Link>
-                  <Link href="/register" onClick={() => setMenuOpen(false)} className="btn-primary !p-0 h-full">
-                    Register
-                  </Link>
-                </div>
+                <Link
+                  href="/login"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center justify-center px-4 py-3 rounded-xl text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200"
+                >
+                  Admin Login
+                </Link>
               )}
             </div>
           )}

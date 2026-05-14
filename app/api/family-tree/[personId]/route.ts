@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { requireAuth, isResponse } from "@/lib/auth-helpers";
-import { NextRequest } from "next/server";
+import { getSessionFromRequest } from "@/lib/session";
+import { NextRequest, NextResponse } from "next/server";
 
 export type PersonSnap = {
   id: string;
@@ -36,17 +36,17 @@ async function buildDownward(
   personId: string,
   visited: Set<string>,
   depth: number,
-  userId: string,
+  userId: string | undefined,
   isAdmin: boolean
 ): Promise<TreeNode | null> {
   if (depth > 8 || visited.has(personId)) return null;
   visited.add(personId);
 
-  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: userId };
+  const personWhere = (isAdmin || !userId) ? { id: personId } : { id: personId, submittedBy: userId };
   const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return null;
 
-  const familyWhere = isAdmin
+  const familyWhere = (isAdmin || !userId)
     ? { OR: [{ husbandId: personId }, { wifeId: personId }] }
     : { OR: [{ husbandId: personId }, { wifeId: personId }], submittedBy: userId };
 
@@ -64,7 +64,7 @@ async function buildDownward(
       const partnerId = family.husbandId === personId ? family.wifeId : family.husbandId;
       if (!visited.has(partnerId)) {
         visited.add(partnerId);
-        const partnerWhere = isAdmin ? { id: partnerId } : { id: partnerId, submittedBy: userId };
+        const partnerWhere = (isAdmin || !userId) ? { id: partnerId } : { id: partnerId, submittedBy: userId };
         const rec = await prisma.person.findFirst({ where: partnerWhere });
         if (rec) partner = toSnap(rec);
       }
@@ -85,17 +85,17 @@ async function buildUpward(
   personId: string,
   visited: Set<string>,
   depth: number,
-  userId: string,
+  userId: string | undefined,
   isAdmin: boolean
 ): Promise<TreeNode | null> {
   if (depth > 8 || visited.has(personId)) return null;
   visited.add(personId);
 
-  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: userId };
+  const personWhere = (isAdmin || !userId) ? { id: personId } : { id: personId, submittedBy: userId };
   const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return null;
 
-  const familyWhere = isAdmin
+  const familyWhere = (isAdmin || !userId)
     ? { OR: [{ sonIds: { has: personId } }, { daughterIds: { has: personId } }] }
     : {
         AND: [
@@ -126,23 +126,22 @@ async function buildUpward(
 
 export async function GET(
   request: NextRequest,
-  ctx: RouteContext<"/api/family-tree/[personId]">
+  ctx: any
 ) {
-  const auth = await requireAuth(request);
-  if (isResponse(auth)) return auth;
-
+  const session = await getSessionFromRequest(request);
   const { personId } = await ctx.params;
   const direction = request.nextUrl.searchParams.get("direction") ?? "downward";
-  const isAdmin = auth.role === "admin";
+  const isAdmin = session?.role === "admin";
+  const userId = session?.userId;
 
-  const personWhere = isAdmin ? { id: personId } : { id: personId, submittedBy: auth.userId };
+  const personWhere = (isAdmin || !userId) ? { id: personId } : { id: personId, submittedBy: userId };
   const person = await prisma.person.findFirst({ where: personWhere });
   if (!person) return Response.json({ error: "Person not found" }, { status: 404 });
 
   const tree =
     direction === "upward"
-      ? await buildUpward(personId, new Set(), 0, auth.userId, isAdmin)
-      : await buildDownward(personId, new Set(), 0, auth.userId, isAdmin);
+      ? await buildUpward(personId, new Set(), 0, userId, isAdmin)
+      : await buildDownward(personId, new Set(), 0, userId, isAdmin);
 
   return Response.json({ tree, direction });
 }

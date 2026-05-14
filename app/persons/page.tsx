@@ -516,13 +516,13 @@ export default function PersonsPage() {
                               {p.fatherName && (
                                 <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
                                   <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Father</span>
-                                  <span className="italic px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 ring-1 ring-blue-100 text-[11px] truncate ml-4">{p.fatherName}</span>
+                                  <span className="italic px-1.5 py-0.5 text-blue-700 text-[11px] truncate ml-4">{p.fatherName}</span>
                                 </div>
                               )}
                               {p.motherName && (
                                 <div className="flex items-center justify-between pt-1">
                                   <span className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">Mother</span>
-                                  <span className="italic px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 ring-1 ring-pink-100 text-[11px] truncate ml-4">{p.motherName}</span>
+                                  <span className="italic px-1.5 py-0.5 text-pink-700 text-[11px] truncate ml-4 ">{p.motherName}</span>
                                 </div>
                               )}
                               {p.caste && (
@@ -621,7 +621,7 @@ export default function PersonsPage() {
                             <td className="px-6 py-4">
                               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${p.isAlive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${p.isAlive ? "bg-emerald-500" : "bg-slate-400"}`} />
-                                {p.isAlive ? "Living" : "Deceased"}
+                                {p.isAlive ? "Alive" : "Deceased"}
                               </span>
                             </td>
                             {isAdmin && (

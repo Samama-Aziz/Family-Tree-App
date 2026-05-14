@@ -3,6 +3,9 @@
 import { useState, useEffect, useTransition, useRef } from "react";
 import { formatDate } from "@/lib/format-date";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { useAuth } from "@/components/AuthContext";
+import { toPng } from "html-to-image";
+import jsPDF from "jspdf";
 
 type Person = { id: string; name: string; nameUrdu?: string | null; gender: string; fatherName?: string | null; motherName?: string | null; caste?: string | null };
 
@@ -98,7 +101,7 @@ function PersonDetailModal({
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${person.isAlive ? "bg-emerald-500" : "bg-slate-400"}`} />
-                {person.isAlive ? "Living" : "Deceased"}
+                {person.isAlive ? "Alive" : "Deceased"}
               </span>
             </div>
 
@@ -137,10 +140,12 @@ function PersonCard({
   node,
   isRoot = false,
   onPersonClick,
+  isAdmin = false,
 }: {
   node: PersonSnap & { relation?: string };
   isRoot?: boolean;
   onPersonClick: (id: string) => void;
+  isAdmin?: boolean;
 }) {
   const dot =
     node.gender === "Male"
@@ -159,8 +164,8 @@ function PersonCard({
 
   return (
     <div
-      onClick={() => onPersonClick(node.id)}
-      className={`px-3 sm:px-4 md:px-5 py-3 sm:py-4 rounded-2xl border-2 text-center min-w-[130px] sm:min-w-[150px] max-w-[220px] cursor-pointer hover:shadow-md hover:ring-2 hover:ring-brand-primary/30 transition-all duration-200 ${card}`}
+      onClick={() => isAdmin && onPersonClick(node.id)}
+      className={`px-3 sm:px-4 md:px-5 py-3 sm:py-4 rounded-2xl border-2 text-center min-w-[130px] sm:min-w-[150px] max-w-[220px] transition-all duration-200 ${card} ${isAdmin ? "cursor-pointer hover:shadow-md hover:ring-2 hover:ring-brand-primary/30" : "cursor-default"}`}
     >
       {node.relation && (
         <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1.5">
@@ -178,7 +183,7 @@ function PersonCard({
           </p>
         )}
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">
-          {node.age ? `${node.age} yrs` : node.isAlive ? "Living" : "Deceased"}
+          {node.age ? `${node.age} yrs` : node.isAlive ? "Alive" : "Deceased"}
         </p>
       </div>
     </div>
@@ -192,104 +197,152 @@ function TreeView({
   isRoot = false,
   direction,
   onPersonClick,
+  isAdmin = false,
 }: {
   node: TreeNode;
   isRoot?: boolean;
   direction: "upward" | "downward";
   onPersonClick: (id: string) => void;
+  isAdmin?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+
   const hasChildren = (node.children?.length ?? 0) > 0;
   const isUp = direction === "upward";
 
+  // Couple row
   const coupleRow = (
-    <div className="flex items-center gap-3">
-      <PersonCard node={node} isRoot={isRoot} onPersonClick={onPersonClick} />
+    <div className="flex items-center gap-3 relative z-10 bg-white px-2">
+      <PersonCard
+        node={node}
+        isRoot={isRoot}
+        onPersonClick={onPersonClick}
+        isAdmin={isAdmin}
+      />
+
       {node.partner && (
         <>
-          <span className="text-slate-300 text-2xl font-thin select-none">+</span>
-          <PersonCard node={node.partner} onPersonClick={onPersonClick} />
+          <span className="text-black font-bold select-none leading-none">
+            +
+          </span>
+
+          <PersonCard
+            node={node.partner}
+            onPersonClick={onPersonClick}
+            isAdmin={isAdmin}
+          />
         </>
       )}
     </div>
   );
 
+  // Toggle button
   const toggleBtn = hasChildren && (
     <button
       type="button"
       onClick={() => setCollapsed((c) => !c)}
-      className={`w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-[10px] font-black text-slate-400 hover:border-brand-primary hover:text-brand-primary transition-all duration-300 ${
-        isUp ? (collapsed ? "rotate-180" : "") : collapsed ? "" : "rotate-180"
+      className={`w-6 h-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-[10px] font-black text-slate-500 hover:border-brand-primary hover:text-brand-primary transition-all duration-300 ${
+        collapsed ? "" : "rotate-180"
       }`}
     >
       {isUp ? "↑" : "↓"}
     </button>
   );
 
-  const childrenBlock = hasChildren && !collapsed && (
-    isUp ? (
-      <>
-        {node.children!.length === 2 ? (
-          // Father + Mother couple pair — shown side-by-side with +
-          <div className="relative flex gap-3 items-end px-4">
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-400" />
-            <div className="flex flex-col items-center">
-              <TreeView node={node.children![0]} direction={direction} onPersonClick={onPersonClick} />
-              <div className="w-0.5 h-8 bg-slate-400" />
-            </div>
-            <span className="text-slate-300 text-2xl font-thin mb-8 select-none flex-shrink-0">+</span>
-            <div className="flex flex-col items-center">
-              <TreeView node={node.children![1]} direction={direction} onPersonClick={onPersonClick} />
-              <div className="w-0.5 h-8 bg-slate-400" />
-            </div>
-          </div>
-        ) : (
-          <div className="relative flex gap-10 items-end px-4">
+  // Children block
+  const childrenBlock =
+    hasChildren && !collapsed ? (
+      isUp ? (
+        <>
+          {/* Children */}
+          <div className="relative flex gap-10 items-end px-4 pb-4">
+            {/* Horizontal connector */}
             {node.children!.length > 1 && (
               <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-slate-400" />
             )}
+
             {node.children!.map((child, i) => (
-              <div key={child.id + i} className="flex flex-col items-center">
-                <TreeView node={child} direction={direction} onPersonClick={onPersonClick} />
+              <div
+                key={child.id + i}
+                className="flex flex-col items-center"
+              >
+                <TreeView
+                  node={child}
+                  direction={direction}
+                  onPersonClick={onPersonClick}
+                  isAdmin={isAdmin}
+                />
+
+                {/* Vertical connector */}
                 <div className="w-0.5 h-8 bg-slate-400" />
               </div>
             ))}
           </div>
-        )}
-        <div className="w-0.5 h-5 bg-slate-400" />
-      </>
-    ) : (
-      <>
-        <div className="w-0.5 h-5 bg-slate-400" />
-        <div className="relative flex gap-10 items-start px-4">
-          {node.children!.length > 1 && (
-            <div className="absolute top-0 left-4 right-4 h-0.5 bg-slate-400" />
-          )}
-          {node.children!.map((child, i) => (
-            <div key={child.id + i} className="flex flex-col items-center">
-              <div className="w-0.5 h-8 bg-slate-400" />
-              <TreeView node={child} direction={direction} onPersonClick={onPersonClick} />
-            </div>
-          ))}
-        </div>
-      </>
-    )
-  );
 
+          {/* Main connector */}
+          <div className="w-0.5 h-5 bg-slate-400" />
+        </>
+      ) : (
+        <>
+          {/* Main connector */}
+          <div className="w-0.5 h-5 bg-slate-400" />
+
+          {/* Children */}
+          <div className="relative flex gap-10 items-start px-4">
+            {/* Horizontal connector */}
+            {node.children!.length > 1 && (
+              <div className="absolute top-0 left-4 right-4 h-0.5 bg-slate-400" />
+            )}
+
+            {node.children!.map((child, i) => (
+              <div
+                key={child.id + i}
+                className="flex flex-col items-center"
+              >
+                {/* Vertical connector */}
+                <div className="w-0.5 h-8 bg-slate-400" />
+
+                <TreeView
+                  node={child}
+                  direction={direction}
+                  onPersonClick={onPersonClick}
+                  isAdmin={isAdmin}
+                />
+              </div>
+            ))}
+          </div>
+        </>
+      )
+    ) : null;
+
+  // Upward tree
   if (isUp) {
     return (
       <div className="flex flex-col items-center">
         {childrenBlock}
-        {hasChildren && <div className="mb-3">{toggleBtn}</div>}
+
+        {hasChildren && (
+          <div className="mb-3">
+            {toggleBtn}
+          </div>
+        )}
+
         {coupleRow}
       </div>
     );
   }
 
+  // Downward tree
   return (
     <div className="flex flex-col items-center">
       {coupleRow}
-      {hasChildren && <div className="mt-3">{toggleBtn}</div>}
+
+      {hasChildren && (
+        <div className="mt-3">
+          {toggleBtn}
+        </div>
+      )}
+
       {childrenBlock}
     </div>
   );
@@ -298,7 +351,19 @@ function TreeView({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FamilyTreePage() {
-  const [persons, setPersons] = useState<Person[]>([]);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const [persons, setPersons] = useState<Person[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const cached = localStorage.getItem("cache_persons");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [selectedId, setSelectedId] = useState("");
   const [personQuery, setPersonQuery] = useState("");
   const [isPersonOpen, setIsPersonOpen] = useState(false);
@@ -308,16 +373,17 @@ export default function FamilyTreePage() {
   const [error, setError] = useState("");
   const [detailPersonId, setDetailPersonId] = useState<string | null>(null);
   const [slowNetwork, setSlowNetwork] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const personSelectorRef = useRef<HTMLDivElement>(null);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+  const treeInnerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Load from cache first
-    const cached = localStorage.getItem("cache_persons");
-    if (cached) setPersons(JSON.parse(cached));
-
     fetch("/api/persons").then((r) => r.json()).then((data) => {
-      setPersons(data);
-      if (Array.isArray(data)) localStorage.setItem("cache_persons", JSON.stringify(data));
+      if (Array.isArray(data)) {
+        setPersons(data);
+        localStorage.setItem("cache_persons", JSON.stringify(data));
+      }
     });
   }, []);
 
@@ -333,7 +399,7 @@ export default function FamilyTreePage() {
   }, []);
 
 const filteredPersons = persons.filter((p) => {
-  const haystack = [p.name, p.nameUrdu, p.gender, p.fatherName, p.motherName, p.caste]
+  const haystack = [p.name]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
@@ -364,6 +430,46 @@ const filteredPersons = persons.filter((p) => {
         setError("Failed to load tree");
       }
     });
+  }
+
+  async function handleDownloadPDF() {
+    if (!tree || !treeInnerRef.current) return;
+
+    setIsDownloading(true);
+    try {
+      const el = treeInnerRef.current;
+      const naturalW = el.scrollWidth;
+      const naturalH = el.scrollHeight;
+
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+        width: naturalW,
+        height: naturalH,
+      });
+
+      const isLandscape = naturalW > naturalH;
+      const pdf = new jsPDF({
+        orientation: isLandscape ? "landscape" : "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const scale = Math.min((pageW - margin * 2) / naturalW, (pageH - margin * 2) / naturalH);
+      const imgW = naturalW * scale;
+      const imgH = naturalH * scale;
+
+      pdf.addImage(dataUrl, "PNG", (pageW - imgW) / 2, (pageH - imgH) / 2, imgW, imgH);
+      pdf.save(`${tree.name}_family_tree.pdf`);
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      setError("Failed to download PDF");
+    } finally {
+      setIsDownloading(false);
+    }
   }
 
   return (
@@ -510,7 +616,33 @@ const filteredPersons = persons.filter((p) => {
         {/* Tree */}
         {tree ? (
           <div className="glass-card overflow-hidden animate-slide-up" style={{ animationDelay: "100ms" }}>
-            <div className="p-8 pb-0 text-center">
+            <div className="p-8 pb-0 text-center relative">
+              <div className="absolute top-4 right-4">
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={isDownloading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-primary text-white font-semibold hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {isDownloading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Download PDF
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="inline-block px-4 py-1.5 rounded-full bg-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">
                 {direction === "downward" ? "Descendant Chart" : "Ancestry Chart"}
               </div>
@@ -530,7 +662,7 @@ const filteredPersons = persons.filter((p) => {
                 <span className="w-3 h-3 rounded-full bg-pink-200 border-2 border-pink-300 inline-block" /> Female
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="text-slate-300 font-thin text-base">+</span> Couple
+                <span className="text-Black-300 font-bold text-base">+</span> Couple
               </span>
               <span className="flex items-center gap-1.5 text-slate-400">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -538,7 +670,7 @@ const filteredPersons = persons.filter((p) => {
               </span>
             </div>
 
-            <div className="relative h-[600px] border-t border-slate-100 bg-slate-50/30">
+            <div className="relative h-[600px] border-t border-slate-100 bg-slate-50/30" ref={treeContainerRef}>
               <TransformWrapper
                 initialScale={0.8}
                 minScale={0.1}
@@ -578,12 +710,13 @@ const filteredPersons = persons.filter((p) => {
                         minHeight: "100%",
                       }}
                     >
-                      <div className="flex justify-center flex-shrink-0">
+                      <div ref={treeInnerRef} className="flex justify-center flex-shrink-0">
                         <TreeView
                           node={tree}
                           isRoot
                           direction={direction}
                           onPersonClick={setDetailPersonId}
+                          isAdmin={isAdmin}
                         />
                       </div>
                     </TransformComponent>

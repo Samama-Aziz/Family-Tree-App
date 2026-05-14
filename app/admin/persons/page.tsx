@@ -366,7 +366,7 @@ export default function AdminPersonsPage() {
                           }`}>{item.gender}</span>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-tight ${
                             item.isAlive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
-                          }`}>{item.isAlive ? "Living" : "Deceased"}</span>
+                          }`}>{item.isAlive ? "Alive" : "Deceased"}</span>
                         </div>
                       </div>
 

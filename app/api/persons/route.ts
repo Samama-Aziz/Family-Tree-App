@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAuth, isResponse } from "@/lib/auth-helpers";
+import { getSessionFromRequest } from "@/lib/session";
 import { generatePersonDisplayId } from "@/lib/id-generator";
 import { NextRequest } from "next/server";
 
@@ -22,11 +23,17 @@ function toPersonWithDerivedAge(person: {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (isResponse(auth)) return auth;
+  const session = await getSessionFromRequest(request);
 
   try {
-    const where = auth.role === "admin" ? {} : { submittedBy: auth.userId };
+    let where = {};
+    if (!session) {
+      // Public view of persons for search (e.g. in tree generator)
+      where = {};
+    } else if (session.role !== "admin") {
+      where = { submittedBy: session.userId };
+    }
+    
     const persons = await prisma.person.findMany({ where, orderBy: { name: "asc" } });
 
     const userIds = [...new Set(persons.map((p) => p.submittedBy).filter(Boolean))] as string[];
